@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f5f6f8">
+<title>舒尔特方格 · 注意力训练</title>
+<style>
+/* ============================================================
+   舒尔特方格训练 · 本地离线版
+   设计系统：浅色简洁风
+   ============================================================ */
+:root{
+  --bg:#f4f5f7;
+  --card:#ffffff;
+  --text:#111418;
+  --text2:#4a5261;
+  --muted:#8b93a1;
+  --line:#e7e9ee;
+  --line-soft:#f0f1f5;
+  --accent:#2f6bff;
+  --accent-dark:#1f52d6;
+  --accent-soft:#eef3ff;
+  --ok:#12b76a;
+  --ok-soft:#e8f8f0;
+  --err:#f04438;
+  --err-soft:#fdecea;
+  --alt1:#f79009;
+  --alt2:#2f6bff;
+  --shadow-sm:0 1px 2px rgba(16,24,40,.04);
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 6px 20px rgba(16,24,40,.07);
+  --shadow-lg:0 8px 40px rgba(16,24,40,.14);
+  --r-xl:20px;
+  --r-lg:16px;
+  --r-md:12px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,system-ui,sans-serif;
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+  overscroll-behavior:none;
+}
+body.locked{overflow:hidden}
+button{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#d7dae1;border-radius:8px}
+
+/* ---------------- 顶部栏 ---------------- */
+.topbar{
+  position:sticky;top:0;z-index:20;
+  padding:calc(14px + var(--safe-t)) 18px 12px;
+  background:rgba(244,245,247,.86);
+  backdrop-filter:saturate(180%) blur(14px);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid transparent;
+  transition:border-color .2s;
+}
+.topbar.scrolled{border-bottom-color:var(--line)}
+.topbar-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;letter-spacing:-.01em;flex:1;min-width:0}
+.brand .logo{
+  width:26px;height:26px;border-radius:8px;flex:none;
+  background:linear-gradient(140deg,#4a86ff,#2f6bff 55%,#1f52d6);
+  box-shadow:0 3px 8px rgba(47,107,255,.32);
+  display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;
+  gap:2px;padding:5px;
+}
+.brand .logo i{background:rgba(255,255,255,.9);border-radius:1.5px}
+.brand .logo i:nth-child(2){opacity:.55}
+.brand .logo i:nth-child(3){opacity:.55}
+
+.tabs{display:flex;background:#e9ebf0;border-radius:11px;padding:3px;gap:2px;flex:none}
+.tabs button{
+  padding:6px 15px;border-radius:9px;font-size:14px;font-weight:600;color:var(--text2);
+  transition:background .18s,color .18s,box-shadow .18s;
+}
+.tabs button.on{background:#fff;color:var(--text);box-shadow:var(--shadow-sm)}
+
+/* ---------------- 布局 ---------------- */
+main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
+.view{display:none;animation:fadeUp .3s cubic-bezier(.22,.85,.3,1)}
+.view.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.card{
+  background:var(--card);border-radius:var(--r-xl);padding:16px;
+  box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.7);
+  margin-bottom:14px;
+}
+.card-title{
+  font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;
+  margin:0 0 12px;display:flex;align-items:center;gap:6px;
+}
+.card-title .hint{font-weight:500;letter-spacing:0;font-size:12px;color:#a7aeb9;margin-left:auto}
+
+/* ---------------- 规格选择 ---------------- */
+.seg{display:flex;gap:8px}
+.seg.col{display:grid;grid-template-columns:repeat(5,1fr)}
+.seg button{
+  flex:1;padding:12px 4px;border-radius:var(--r-md);background:#f5f6f9;
+  font-size:14px;font-weight:600;color:var(--text2);
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:transform .14s cubic-bezier(.3,1.4,.5,1),background .18s,color .18s,box-shadow .18s;
+  border:1px solid transparent;
+}
+.seg button:active{transform:scale(.94)}
+.seg button small{font-size:10px;font-weight:500;color:#a7aeb9;letter-spacing:0}
+.seg button.on{
+  background:var(--accent-soft);color:var(--accent);border-color:#c9daff;
+  box-shadow:0 2px 8px rgba(47,107,255,.13);
+}
+.seg button.on small{color:#7ba0ff}
+
+/* ---------------- 模式选择 ---------------- */
+.modes{display:flex;flex-direction:column;gap:8px}
+.mode{
+  display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:var(--r-lg);
+  background:#fafbfc;border:1.5px solid var(--line);
+  text-align:left;transition:border-color .18s,background .18s,transform .14s cubic-bezier(.3,1.4,.5,1);
+  width:100%;
+}
+.mode:active{transform:scale(.985)}
+.mode .ico{
+  width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;
+  background:#eef0f4;font-size:13px;font-weight:800;color:var(--text2);letter-spacing:-.02em;
+  transition:background .18s,color .18s;
+}
+.mode .tx{flex:1;min-width:0}
+.mode .tx b{display:block;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.mode .tx span{display:block;font-size:12.5px;color:var(--muted);line-height:1.45;margin-top:1px}
+.mode .tick{
+  width:20px;height:20px;border-radius:50%;flex:none;border:1.5px solid #d5d9e0;
+  display:grid;place-items:center;transition:all .18s;
+}
+.mode .tick svg{opacity:0;transform:scale(.4);transition:all .18s}
+.mode.on{background:#fff;border-color:var(--accent);box-shadow:0 3px 14px rgba(47,107,255,.12)}
+.mode.on .ico{background:var(--accent-soft);color:var(--accent)}
+.mode.on .tick{background:var(--accent);border-color:var(--accent)}
+.mode.on .tick svg{opacity:1;transform:scale(1)}
+
+/* ---------------- 开关 ---------------- */
+.row{display:flex;align-items:center;gap:14px;padding:11px 2px}
+.row+.row{border-top:1px solid var(--line-soft)}
+.row .rt{flex:1;min-width:0}
+.row .rt b{display:block;font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.row .rt span{display:block;font-size:12px;color:var(--muted);margin-top:1px;line-height:1.4}
+.switch{position:relative;flex:none;width:48px;height:29px}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}
+.switch .track{
+  position:absolute;inset:0;border-radius:99px;background:#dcdfe5;
+  transition:background .22s cubic-bezier(.3,.9,.3,1);
+}
+.switch .track::after{
+  content:'';position:absolute;top:2.5px;left:2.5px;width:24px;height:24px;border-radius:50%;
+  background:#fff;box-shadow:0 2px 5px rgba(16,24,40,.2);
+  transition:transform .22s cubic-bezier(.3,1.3,.5,1);
+}
+.switch input:checked+.track{background:var(--accent)}
+.switch input:checked+.track::after{transform:translateX(19px)}
+.switch input:focus-visible+.track{box-shadow:0 0 0 3px rgba(47,107,255,.3)}
+
+/* ---------------- 主按钮 ---------------- */
+.cta{margin-top:16px}
+.btn-start{
+  width:100%;padding:17px;border-radius:var(--r-lg);
+  background:linear-gradient(180deg,#3f7bff,#2f6bff);
+  color:#fff;font-size:17px;font-weight:700;letter-spacing:.02em;
+  box-shadow:0 6px 20px rgba(47,107,255,.34),0 1px 0 rgba(255,255,255,.28) inset;
+  transition:transform .14s cubic-bezier(.3,1.4,.5,1),box-shadow .2s,filter .2s;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+}
+.btn-start:active{transform:scale(.975);box-shadow:0 3px 12px rgba(47,107,255,.3)}
+.btn-start .pbest{
+  font-size:12px;font-weight:600;background:rgba(255,255,255,.22);
+  padding:3px 9px;border-radius:99px;letter-spacing:0;
+}
+.btn-ghost{
+  padding:11px 18px;border-radius:var(--r-md);background:#f0f1f5;color:var(--text2);
+  font-size:14.5px;font-weight:600;transition:background .18s,transform .14s;
+}
+.btn-ghost:active{transform:scale(.96);background:#e6e8ee}
+.btn-primary{
+  padding:14px 22px;border-radius:var(--r-md);background:var(--accent);color:#fff;
+  font-size:15.5px;font-weight:650;box-shadow:0 4px 14px rgba(47,107,255,.28);
+  transition:transform .14s cubic-bezier(.3,1.4,.5,1);
+}
+.btn-primary:active{transform:scale(.96)}
+.btn-danger{color:var(--err);background:var(--err-soft)}
+
+.tip{
+  font-size:12.5px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.6;
+}
+
+/* ============================================================
+   训练全屏层
+   ============================================================ */
+#trainScreen{
+  position:fixed;inset:0;z-index:60;background:var(--bg);
+  display:none;flex-direction:column;
+  padding:calc(10px + var(--safe-t)) 14px calc(14px + var(--safe-b));
+}
+#trainScreen.on{display:flex;animation:fadeIn .22s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.train-top{display:flex;align-items:center;gap:10px;flex:none;max-width:640px;width:100%;margin:0 auto}
+.icon-btn{
+  width:40px;height:40px;border-radius:12px;background:#fff;box-shadow:var(--shadow-sm);
+  display:grid;place-items:center;color:var(--text2);flex:none;
+  transition:transform .14s,background .18s;border:1px solid var(--line);
+}
+.icon-btn:active{transform:scale(.92);background:#f4f5f8}
+.readout{
+  flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.timer{
+  font-size:27px;font-weight:700;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
+  line-height:1;
+}
+.timer small{font-size:13px;font-weight:600;color:var(--muted);margin-left:3px;letter-spacing:0}
+.timer.rec{color:var(--ok)}
+.colorchip{
+  display:none;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
+  padding:3px 9px;border-radius:99px;background:#fff;border:1px solid var(--line);
+  color:var(--text2);flex:none;
+}
+.colorchip.on{display:flex}
+.colorchip i{width:9px;height:9px;border-radius:50%;background:var(--alt1);flex:none}
+.colorchip.blue i{background:var(--alt2)}
+
+.progressbar{
+  height:4px;background:#e5e7ec;border-radius:99px;margin:12px auto 0;overflow:hidden;
+  flex:none;max-width:640px;width:100%;
+}
+.progressbar i{
+  display:block;height:100%;width:0%;border-radius:99px;
+  background:linear-gradient(90deg,#4a86ff,#2f6bff);
+  transition:width .18s cubic-bezier(.3,.9,.3,1);
+}
+
+.board-wrap{
+  flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+  position:relative;margin-top:12px;
+}
+.board{
+  display:grid;position:relative;
+  transition:filter .3s ease,opacity .3s ease;
+}
+.board.blur{filter:blur(14px);opacity:.35;pointer-events:none}
+
+.cell{
+  position:relative;display:grid;place-items:center;
+  background:#fff;border:1px solid var(--line);
+  font-weight:600;font-variant-numeric:tabular-nums;
+  color:var(--text);letter-spacing:-.02em;
+  box-shadow:0 1px 2px rgba(16,24,40,.045);
+  transition:background .16s ease,color .16s ease,transform .16s cubic-bezier(.3,1.3,.5,1),
+             opacity .3s ease,border-color .16s ease,box-shadow .16s;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;
+}
+.cell.c-alt1{color:var(--alt1)}
+.cell.c-alt2{color:var(--alt2)}
+.cell.c-alpha{color:#7a5af8}
+.cell:active{transform:scale(.95)}
+.cell.done{
+  background:var(--accent-soft);border-color:#d4e0ff;color:#a8bcf0;
+  box-shadow:none;opacity:.62;pointer-events:none;transform:none;
+}
+.cell.pop{animation:pop .22s cubic-bezier(.3,1.5,.5,1)}
+@keyframes pop{
+  0%{transform:scale(.9)}
+  55%{transform:scale(1.06)}
+  100%{transform:scale(1)}
+}
+.cell.wrong{
+  background:var(--err-soft);border-color:#f8c9c4;color:var(--err);
+  animation:shake .36s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes shake{
+  10%,90%{transform:translateX(-2px)}
+  20%,80%{transform:translateX(4px)}
+  30%,50%,70%{transform:translateX(-6px)}
+  40%,60%{transform:translateX(6px)}
+}
+
+/* 中央注视点 */
+.fixdot{
+  position:absolute;left:50%;top:50%;width:9px;height:9px;border-radius:50%;
+  margin:-4.5px 0 0 -4.5px;background:rgba(47,107,255,.72);
+  box-shadow:0 0 0 3px rgba(47,107,255,.16),0 0 0 5px rgba(255,255,255,.95);
+  pointer-events:none;display:none;z-index:3;
+}
+.fixdot.on{display:block}
+.hintpill{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  margin-top:34px;padding:7px 15px;border-radius:99px;background:rgba(255,255,255,.94);
+  box-shadow:var(--shadow);border:1px solid var(--line);
+  font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;
+  display:none;z-index:4;backdrop-filter:blur(6px);
+}
+.hintpill.on{display:block}
+.hintpill .k{font-weight:600;color:var(--muted);font-size:.72em;letter-spacing:0;margin-right:4px}
+.hintpill.c-alt1{color:var(--alt1)}
+.hintpill.c-alt2{color:var(--alt2)}
+.hintpill.c-alpha{color:#7a5af8}
+
+/* ============================================================
+   覆盖层
+   ============================================================ */
+.overlay{
+  position:fixed;inset:0;z-index:80;display:none;
+  align-items:center;justify-content:center;padding:24px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:rgba(244,245,247,.82);
+  backdrop-filter:blur(16px) saturate(160%);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);
+}
+.overlay.on{display:flex;animation:fadeIn .22s ease}
+
+/* 倒计时 */
+/* 倒计时期间方格只保留自身模糊，便于「看到但看不清」*/
+#countdown{background:rgba(244,245,247,.38);backdrop-filter:none;-webkit-backdrop-filter:none}
+.cd-num{
+  font-size:clamp(90px,30vw,170px);font-weight:800;letter-spacing:-.05em;color:var(--text);
+  line-height:1;animation:cdIn .62s cubic-bezier(.2,.9,.3,1);
+  background:linear-gradient(180deg,#3f7bff,#1f52d6);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+@keyframes cdIn{
+  0%{opacity:0;transform:scale(.55)}
+  35%{opacity:1;transform:scale(1.04)}
+  70%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.14)}
+}
+.cd-go{font-size:clamp(44px,12vw,64px)!important;letter-spacing:.06em!important}
+
+/* 面板 */
+.panel{
+  background:#fff;border-radius:24px;padding:26px 22px;width:100%;max-width:330px;
+  box-shadow:var(--shadow-lg);text-align:center;
+  animation:panelIn .3s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes panelIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.panel h2{margin:0 0 4px;font-size:19px;font-weight:700;letter-spacing:-.01em}
+.panel .sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+.panel .btns{display:flex;flex-direction:column;gap:9px;margin-top:20px}
+.panel .btns .btn-primary,.panel .btns .btn-ghost{width:100%}
+
+/* 结算 */
+.res-time{
+  font-size:54px;font-weight:800;letter-spacing:-.045em;line-height:1;
+  font-variant-numeric:tabular-nums;margin:4px 0 2px;
+  background:linear-gradient(180deg,#3f7bff,#1f52d6);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.res-time small{font-size:19px;font-weight:700;-webkit-text-fill-color:var(--muted);color:var(--muted);margin-left:2px;letter-spacing:0}
+.res-time.isrec{background:linear-gradient(180deg,#22c777,#0f9d58);-webkit-background-clip:text;background-clip:text}
+.badge{
+  display:inline-flex;align-items:center;gap:5px;margin-bottom:10px;
+  padding:4px 11px;border-radius:99px;font-size:12px;font-weight:700;
+  background:var(--ok-soft);color:#0e9f60;
+}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+.grid3 div{background:#f7f8fa;border-radius:13px;padding:11px 4px}
+.grid3 b{display:block;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.grid3 span{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ============================================================
+   记录 / 统计
+   ============================================================ */
+.stats-hd{display:flex;align-items:baseline;gap:10px;margin:2px 4px 12px}
+.stats-hd h2{margin:0;font-size:21px;font-weight:750;letter-spacing:-.02em}
+.stats-hd span{font-size:12.5px;color:var(--muted)}
+
+.mini-seg{display:flex;gap:6px;flex-wrap:wrap}
+.mini-seg button{
+  padding:7px 13px;border-radius:99px;background:#f2f3f7;font-size:13px;font-weight:600;color:var(--text2);
+  transition:all .16s;border:1px solid transparent;
+}
+.mini-seg button:active{transform:scale(.94)}
+.mini-seg button.on{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 3px 10px rgba(47,107,255,.25)}
+
+.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sum{background:#fafbfc;border:1px solid var(--line);border-radius:var(--r-lg);padding:13px 14px}
+.sum b{display:block;font-size:23px;font-weight:750;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.15}
+.sum b em{font-size:13px;font-weight:600;font-style:normal;color:var(--muted);margin-left:2px}
+.sum span{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.sum.hero{grid-column:1/-1;background:linear-gradient(135deg,#eef3ff,#f7f9ff);border-color:#dbe6ff}
+.sum.hero b{font-size:32px}
+.sum .delta{font-size:11.5px;font-weight:700;margin-top:4px;display:block}
+.sum .delta.up{color:var(--err)}
+.sum .delta.down{color:var(--ok)}
+
+#chartWrap{padding:4px 2px 0}
+#chart{width:100%;display:block;overflow:visible}
+.empty{text-align:center;color:var(--muted);font-size:13.5px;padding:34px 10px;line-height:1.7}
+.empty .big{font-size:30px;display:block;margin-bottom:6px;opacity:.35}
+
+.rlist{display:flex;flex-direction:column;margin-top:2px}
+.ritem{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line-soft)}
+.ritem:last-child{border-bottom:0}
+.ritem .idx{
+  width:26px;height:26px;border-radius:9px;background:#f2f3f7;flex:none;
+  font-size:11.5px;font-weight:700;color:var(--muted);display:grid;place-items:center;
+}
+.ritem .idx.best{background:var(--ok-soft);color:#0e9f60}
+.ritem .info{flex:1;min-width:0}
+.ritem .info b{display:block;font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ritem .info span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.ritem .err{font-size:12px;font-weight:600;color:var(--muted);flex:none}
+.ritem .err.has{color:var(--err)}
+
+.footer-note{text-align:center;font-size:11.5px;color:#a7aeb9;margin:22px 0 4px;line-height:1.7}
+.storage-warn{
+  background:#fff8e8;border:1px solid #ffe2ab;color:#8a5a00;border-radius:12px;
+  padding:10px 13px;font-size:12.5px;line-height:1.55;margin-bottom:14px;
+}
+
+@media (max-width:400px){
+  .seg.col{grid-template-columns:repeat(5,1fr);gap:6px}
+  .seg button{font-size:12.5px;padding:10px 2px}
+  .seg button small{display:none}
+  .card{padding:14px}
+  .summary{grid-template-columns:1fr}
+}
+@media (min-width:700px){
+  .board-wrap{margin-top:18px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar" id="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="logo"><i></i><i></i><i></i><i></i></span>
+      舒尔特方格
+    </div>
+    <nav class="tabs">
+      <button data-view="home" class="on">训练</button>
+      <button data-view="stats">记录</button>
+    </nav>
+  </div>
+</div>
+
+<main>
+  <!-- ==================== 训练设置 ==================== -->
+  <section class="view on" id="view-home">
+    <div id="storageWarn"></div>
+
+    <div class="card">
+      <p class="card-title">方格规格 <span class="hint">数字越多，难度越高</span></p>
+      <div class="seg col" id="sizeSeg">
+        <button data-size="3">3×3<small>9格</small></button>
+        <button data-size="4">4×4<small>16格</small></button>
+        <button data-size="5">5×5<small>25格</small></button>
+        <button data-size="6">6×6<small>36格</small></button>
+        <button data-size="7">7×7<small>49格</small></button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">训练模式</p>
+      <div class="modes" id="modeList">
+        <button class="mode" data-mode="asc">
+          <span class="ico">1→N</span>
+          <span class="tx"><b>正序</b><span>从 1 开始，由小到大依次点击</span></span>
+          <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+        <button class="mode" data-mode="desc">
+          <span class="ico">N→1</span>
+          <span class="tx"><b>倒序</b><span>从最大数开始，由大到小依次点击</span></span>
+          <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+        <button class="mode" data-mode="alt">
+          <span class="ico" style="color:#f79009">◐</span>
+          <span class="tx"><b>橙蓝交替</b><span>橙、蓝两组数字，交替取各组最小者点击</span></span>
+          <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+        <button class="mode" data-mode="mixed">
+          <span class="ico" style="color:#7a5af8">1A</span>
+          <span class="tx"><b>字母数字</b><span>1 → A → 2 → B，数字与字母交替点击</span></span>
+          <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">训练选项</p>
+      <div class="row">
+        <span class="rt"><b>中央注视点</b><span>在方格中央固定视线，用余光搜索数字</span></span>
+        <label class="switch"><input type="checkbox" id="optFixation"><span class="track"></span></label>
+      </div>
+      <div class="row">
+        <span class="rt"><b>显示下一目标</b><span>在中央提示下一个要点的数字</span></span>
+        <label class="switch"><input type="checkbox" id="optHint"><span class="track"></span></label>
+      </div>
+      <div class="row">
+        <span class="rt"><b>音效提示</b><span>点对、点错、完成时的提示音</span></span>
+        <label class="switch"><input type="checkbox" id="optSound"><span class="track"></span></label>
+      </div>
+      <div class="row">
+        <span class="rt"><b>震动反馈</b><span>点对轻微震动，点错双重震动</span></span>
+        <label class="switch"><input type="checkbox" id="optVibrate"><span class="track"></span></label>
+      </div>
+    </div>
+
+    <div class="cta">
+      <button class="btn-start" id="btnStart">
+        <span>开始训练</span>
+        <span class="pbest" id="bestChip" style="display:none"></span>
+      </button>
+      <p class="tip">准备后会倒数 3 秒开始计时<br>点击数字时请尽量保持视线在方格中央</p>
+    </div>
+  </section>
+
+  <!-- ==================== 记录 / 统计 ==================== -->
+  <section class="view" id="view-stats">
+    <div class="stats-hd">
+      <h2>训练记录</h2>
+      <span id="totalsLine"></span>
+    </div>
+
+    <div class="card">
+      <p class="card-title">查看范围</p>
+      <div class="mini-seg" id="statSize" style="margin-bottom:9px"></div>
+      <div class="mini-seg" id="statMode"></div>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="card">
+      <p class="card-title">成绩趋势 <span class="hint" id="chartHint"></span></p>
+      <div id="chartWrap"><div id="chart"></div></div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">历史明细 <span class="hint" id="listHint"></span></p>
+      <div class="rlist" id="recList"></div>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin-top:6px">
+      <button class="btn-ghost btn-danger" id="btnClear">清空全部记录</button>
+    </div>
+    <p class="footer-note">所有成绩仅保存在本机浏览器中，不会上传到任何服务器</p>
+  </section>
+</main>
+
+<!-- ==================== 训练全屏 ==================== -->
+<div id="trainScreen">
+  <div class="train-top">
+    <button class="icon-btn" id="btnPause" aria-label="暂停">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1.3"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1.3"/></svg>
+    </button>
+    <div class="readout">
+      <span class="timer" id="timerEl"><span id="timerNum">0.00</span><small>s</small></span>
+      <span class="colorchip" id="colorChip"><i></i><span id="colorChipTx">橙</span></span>
+    </div>
+    <button class="icon-btn" id="btnQuit" aria-label="退出">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+    </button>
+  </div>
+  <div class="progressbar"><i id="progressFill"></i></div>
+  <div class="board-wrap" id="boardWrap">
+    <div class="board" id="board"></div>
+    <div class="fixdot" id="fixDot"></div>
+    <div class="hintpill" id="hintPill"></div>
+  </div>
+</div>
+
+<!-- ==================== 倒计时 ==================== -->
+<div class="overlay" id="countdown"><div class="cd-num" id="cdNum">3</div></div>
+
+<!-- ==================== 暂停 ==================== -->
+<div class="overlay" id="pauseOverlay">
+  <div class="panel">
+    <h2>已暂停</h2>
+    <p class="sub">计时已停止，休息一下再继续</p>
+    <div class="btns">
+      <button class="btn-primary" id="btnResume">继续训练</button>
+      <button class="btn-ghost" id="btnRestart">重新开始</button>
+      <button class="btn-ghost" id="btnQuit2">退出训练</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 结算 ==================== -->
+<div class="overlay" id="resultOverlay">
+  <div class="panel">
+    <div id="recBadge"></div>
+    <div class="res-time" id="resTime">0.00<small>s</small></div>
+    <p class="sub" id="resSub" style="margin-bottom:0"></p>
+    <div class="grid3">
+      <div><b id="resErr">0</b><span>错误次数</span></div>
+      <div><b id="resAvg">0.00</b><span>平均每格</span></div>
+      <div><b id="resBest">--</b><span>历史最佳</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn-primary" id="btnAgain">再来一次</button>
+      <button class="btn-ghost" id="btnBack">返回设置</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   舒尔特方格训练 · 本地离线版
+   无任何外部依赖：图表为内联 SVG 手绘，音效为 Web Audio 合成
+   ============================================================ */
+
+/* ---------------- 数据层 ---------------- */
+const LS_KEY = "schulte.trainer.v1";
+let storageOK = true;
+const memoryFallback = {};
+
+const DEFAULT_DB = () => ({
+  v: 1,
+  prefs: { size: 5, mode: "asc", fixation: true, hint: false, sound: true, vibrate: true },
+  recs: {},              // "size-mode" -> [{t:ms, e:errors, ts:timestamp}]
+  totals: { sessions: 0, ms: 0 },
+  statsSel: { size: 5, mode: "asc" }
+});
+let DB = DEFAULT_DB();
+
+function loadDB() {
+  let raw = null;
+  try { raw = localStorage.getItem(LS_KEY); }
+  catch (e) { storageOK = false; raw = memoryFallback[LS_KEY] || null; }
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p && typeof p === "object") {
+      DB = Object.assign(DEFAULT_DB(), p);
+      DB.prefs = Object.assign(DEFAULT_DB().prefs, p.prefs || {});
+      DB.totals = Object.assign({ sessions: 0, ms: 0 }, p.totals || {});
+      DB.recs = p.recs || {};
+      DB.statsSel = Object.assign(DEFAULT_DB().statsSel, p.statsSel || {});
+    }
+  } catch (e) { /* 数据损坏则使用默认值 */ }
+}
+let saveTimer = null;
+function saveDB(now) {
+  const doSave = () => {
+    const s = JSON.stringify(DB);
+    try { localStorage.setItem(LS_KEY, s); }
+    catch (e) {
+      storageOK = false;
+      memoryFallback[LS_KEY] = s;
+      renderStorageWarn();
+    }
+  };
+  if (now) { clearTimeout(saveTimer); doSave(); return; }
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 250);
+}
+function renderStorageWarn() {
+  const el = document.getElementById("storageWarn");
+  if (storageOK) { el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="storage-warn">当前浏览器不允许本地存储（可能是隐私模式或以 file:// 打开的限制），本次成绩只保留在内存中，关闭页面后会丢失。</div>';
+}
+
+/* ---------------- 音效（Web Audio 合成，无外部文件） ---------------- */
+let AC = null;
+function audioCtx() {
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    try { AC = new C(); } catch (e) { return null; }
+  }
+  if (AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
+  return AC;
+}
+function beep(freq, dur, type, gain, delay) {
+  if (!DB.prefs.sound) return;
+  const c = audioCtx();
+  if (!c) return;
+  const t0 = c.currentTime + (delay || 0);
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.type = type || "sine";
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain || 0.05, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0 + dur + 0.03);
+}
+const SFX = {
+  ok()     { beep(1180, 0.075, "sine", 0.055); },
+  err()    { beep(190, 0.19, "square", 0.038); beep(140, 0.22, "square", 0.028, 0.055); },
+  tick()   { beep(760, 0.07, "sine", 0.04); },
+  go()     { beep(1320, 0.16, "sine", 0.06); },
+  finish() { [784, 988, 1319, 1568].forEach((f, i) => beep(f, 0.3, "sine", 0.055, i * 0.1)); }
+};
+function vibrate(p) {
+  if (!DB.prefs.vibrate) return;
+  try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+}
+
+/* ---------------- 工具 ---------------- */
+const $ = (s) => document.querySelector(s);
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function fmt(ms) {
+  if (ms === null || ms === undefined || isNaN(ms)) return "--";
+  if (ms < 60000) return (ms / 1000).toFixed(2);
+  const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000;
+  return m + ":" + (s < 10 ? "0" : "") + s.toFixed(2);
+}
+function fmtDate(ts) {
+  const d = new Date(ts);
+  const p = (n) => (n < 10 ? "0" : "") + n;
+  return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function bestOf(key) {
+  const a = DB.recs[key];
+  if (!a || !a.length) return null;
+  let b = Infinity;
+  for (let i = 0; i < a.length; i++) if (a[i].t < b) b = a[i].t;
+  return b;
+}
+
+/* ---------------- 模式定义 ---------------- */
+const MODES = {
+  asc:   { name: "正序",     short: "1→N" },
+  desc:  { name: "倒序",     short: "N→1" },
+  alt:   { name: "橙蓝交替", short: "◐" },
+  mixed: { name: "字母数字", short: "1A" }
+};
+const MODE_KEYS = ["asc", "desc", "alt", "mixed"];
+
+/* ---------------- 出题 ---------------- */
+function buildRound(size, mode) {
+  const n = size * size;
+  let order = [];        // 点击顺序 [{label,color}]
+  if (mode === "asc" || mode === "desc") {
+    for (let i = 1; i <= n; i++) order.push({ label: String(i), color: "num" });
+    if (mode === "desc") order.reverse();
+  } else if (mode === "mixed") {
+    const numCount = Math.ceil(n / 2);
+    for (let i = 1; i <= numCount; i++) {
+      order.push({ label: String(i), color: "num" });
+      if (order.length < n) order.push({ label: String.fromCharCode(64 + i), color: "alpha" });
+    }
+  } else { // alt：橙蓝两组，交替取各组最小
+    const idx = shuffle([...Array(n).keys()]);
+    const orangeCount = Math.ceil(n / 2);
+    const isOrange = new Set(idx.slice(0, orangeCount).map((i) => i + 1));
+    const oNums = [], bNums = [];
+    for (let i = 1; i <= n; i++) (isOrange.has(i) ? oNums : bNums).push(i);
+    oNums.sort((a, b) => a - b);
+    bNums.sort((a, b) => a - b);
+    for (let i = 0; i < oNums.length; i++) {
+      order.push({ label: String(oNums[i]), color: "alt1" });
+      if (bNums[i] !== undefined) order.push({ label: String(bNums[i]), color: "alt2" });
+    }
+  }
+  // 最长标签位数（决定字号上限：1 位数可以放得更大）
+  let maxLen = 1;
+  for (const it of order) if (it.label.length > maxLen) maxLen = it.label.length;
+  // 打乱摆放位置（顺序仍为 order）
+  const board = shuffle(order.map((it) => ({ label: it.label, color: it.color })));
+  return { size, mode, n, order, board, maxLen };
+}
+
+/* ---------------- 运行时状态 ---------------- */
+let G = null;
+const boardEl = $("#board");
+const boardWrap = $("#boardWrap");
+const fixDot = $("#fixDot");
+const hintPill = $("#hintPill");
+const timerEl = $("#timerEl");
+const progressFill = $("#progressFill");
+const colorChip = $("#colorChip");
+const colorChipTx = $("#colorChipTx");
+const trainScreen = $("#trainScreen");
+
+function layoutBoard() {
+  if (!G) return;
+  const w = boardWrap.clientWidth, h = boardWrap.clientHeight;
+  const s = Math.max(120, Math.min(w, h));
+  boardEl.style.width = s + "px";
+  boardEl.style.height = s + "px";
+  const gap = Math.max(3, Math.min(11, s * 0.013));
+  const radius = Math.max(7, Math.min(16, (s / G.size) * 0.19));
+  // 字号按「实际格子宽度」计算；再用最长标签的占宽做一次安全收敛，避免两位数顶到格边
+  const cellW = (s - gap * (G.size - 1)) / G.size;
+  const maxLen = G.maxLen || String(G.size * G.size).length;
+  let fs = cellW * (maxLen <= 1 ? 0.56 : G.size >= 7 ? 0.52 : 0.54);
+  if (maxLen > 1) fs = Math.min(fs, (cellW * 0.86) / (maxLen * 0.62));
+  fs = Math.min(fs, 160);   // 超高分辨率屏幕的兜底上限（正常情况下不会触发）
+  boardEl.style.gridTemplateColumns = "repeat(" + G.size + ",1fr)";
+  boardEl.style.gridTemplateRows = "repeat(" + G.size + ",1fr)";
+  boardEl.style.gap = gap + "px";
+  boardEl.style.fontSize = fs.toFixed(2) + "px";
+  boardEl.style.setProperty("--cellr", radius + "px");
+  for (const c of boardEl.children) c.style.borderRadius = radius + "px";
+  const pillFs = Math.max(13, Math.min(19, s * 0.036));
+  hintPill.style.fontSize = pillFs.toFixed(1) + "px";
+  hintPill.style.marginTop = (s * 0.085) + "px";
+  const dot = Math.max(7, Math.min(12, s * 0.02));
+  fixDot.style.width = dot + "px";
+  fixDot.style.height = dot + "px";
+  fixDot.style.margin = (-dot / 2) + "px 0 0 " + (-dot / 2) + "px";
+}
+
+function renderBoard() {
+  boardEl.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const item of G.board) {
+    const b = document.createElement("button");
+    b.className = "cell" + (item.color !== "num" ? " c-" + item.color : "");
+    b.textContent = item.label;
+    b.dataset.label = item.label;
+    b.type = "button";
+    b.setAttribute("aria-label", item.label);
+    frag.appendChild(b);
+  }
+  boardEl.appendChild(frag);
+  layoutBoard();
+}
+
+function updateHint() {
+  if (!G) return;
+  const cur = G.order[Math.min(G.idx, G.order.length - 1)];
+  const total = G.order.length;
+  const remaining = total - G.idx;
+  // 顶部颜色提示（仅交替模式需要）
+  if (G.mode === "alt" && G.running) {
+    colorChip.classList.add("on");
+    colorChip.classList.toggle("blue", cur.color === "alt2");
+    colorChipTx.textContent = cur.color === "alt1" ? "橙组" : "蓝组";
+  } else {
+    colorChip.classList.remove("on");
+  }
+  // 中央提示
+  if (DB.prefs.hint) {
+    hintPill.className = "hintpill on" + (cur.color !== "num" ? " c-" + cur.color : "");
+    hintPill.innerHTML = '<span class="k">下一个</span>' + cur.label;
+  } else {
+    hintPill.className = "hintpill";
+    hintPill.innerHTML = "";
+  }
+  progressFill.style.width = ((1 - remaining / total) * 100).toFixed(1) + "%";
+  progressFill.style.opacity = G.running ? "1" : "0";
+}
+
+const timerNum = $("#timerNum");
+function updateTimer() {
+  if (!G) return;
+  const t = G.running ? performance.now() - G.startTs - G.pausedTotal : G.elapsed;
+  timerNum.textContent = fmt(t);   // 独立文本节点，避免每帧重建 DOM
+}
+
+/* ---------------- 计时 ---------------- */
+function tickLoop() {
+  if (!G || !G.running) return;
+  updateTimer();
+  G.raf = requestAnimationFrame(tickLoop);
+}
+
+/* ---------------- 开始一局 ---------------- */
+let countdownTimers = [];
+function clearCountdown() {
+  countdownTimers.forEach((t) => clearTimeout(t));
+  countdownTimers = [];
+}
+
+function startRound() {
+  const size = DB.prefs.size, mode = DB.prefs.mode;
+  const round = buildRound(size, mode);
+  G = {
+    size, mode, n: round.n,
+    maxLen: round.maxLen,
+    order: round.order,
+    board: round.board,
+    idx: 0,
+    errors: 0,
+    startTs: 0,
+    pausedTotal: 0,
+    elapsed: 0,
+    running: false,
+    paused: false,
+    raf: 0
+  };
+
+  renderBoard();
+
+  // 复位界面
+  timerNum.textContent = "0.00";
+  timerEl.classList.remove("rec");
+  progressFill.style.width = "0%";
+  progressFill.style.opacity = "0";
+  colorChip.classList.remove("on");
+  hintPill.className = "hintpill";
+  boardEl.classList.remove("blur");
+  closeOverlay("pauseOverlay");
+  closeOverlay("resultOverlay");
+  trainScreen.classList.add("on");
+  document.body.classList.add("locked");
+  layoutBoard();
+  // 释放按钮焦点，避免空格/回车键误触发「开始训练」
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+
+  // 倒计时
+  const cd = $("#countdown");
+  const cdNum = $("#cdNum");
+  cd.classList.add("on");
+  boardEl.classList.add("blur");
+  let step = 0;
+  const seq = ["3", "2", "1", "开始"];
+  const run = () => {
+    if (step >= seq.length) {
+      cd.classList.remove("on");
+      boardEl.classList.remove("blur");
+      G.startTs = performance.now();
+      G.pausedTotal = 0;
+      G.running = true;
+      updateHint();
+      updateTimer();
+      SFX.go();
+      G.raf = requestAnimationFrame(tickLoop);
+      return;
+    }
+    cdNum.textContent = seq[step];
+    cdNum.classList.toggle("cd-go", step === 3);
+    // 重启动画
+    cdNum.style.animation = "none";
+    void cdNum.offsetWidth;
+    cdNum.style.animation = "";
+    if (step < 3) { SFX.tick(); vibrate(10); }
+    step++;
+    countdownTimers.push(setTimeout(run, 640));
+  };
+  run();
+}
+
+function closeOverlay(id) { document.getElementById(id).classList.remove("on"); }
+
+/* ---------------- 点击处理 ---------------- */
+boardEl.addEventListener("pointerdown", (e) => {
+  const cell = e.target.closest(".cell");
+  if (!cell || !G || !G.running || G.paused) return;
+  e.preventDefault();
+  tapCell(cell);
+});
+boardEl.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function tapCell(cell) {
+  const label = cell.dataset.label;
+  const target = G.order[G.idx];
+  if (!target) return;
+
+  if (label === target.label) {
+    cell.classList.add("done", "pop");
+    setTimeout(() => cell.classList.remove("pop"), 230);
+    G.idx++;
+    SFX.ok();
+    vibrate(11);
+    updateHint();
+    if (G.idx >= G.order.length) finishRound();
+  } else {
+    G.errors++;
+    cell.classList.remove("wrong");
+    void cell.offsetWidth;
+    cell.classList.add("wrong");
+    setTimeout(() => cell.classList.remove("wrong"), 380);
+    SFX.err();
+    vibrate([16, 45, 16]);
+  }
+}
+
+/* ---------------- 暂停 / 退出 ---------------- */
+function pauseRound() {
+  if (!G || !G.running || G.paused) return;
+  G.running = false;
+  G.paused = true;
+  cancelAnimationFrame(G.raf);
+  G.elapsed = performance.now() - G.startTs - G.pausedTotal;
+  G.pauseStart = performance.now();
+  boardEl.classList.add("blur");
+  $("#pauseOverlay").classList.add("on");
+  progressFill.style.opacity = "0";
+  colorChip.classList.remove("on");
+}
+function resumeRound() {
+  if (!G || !G.paused) return;
+  G.pausedTotal += performance.now() - G.pauseStart;
+  G.running = true;
+  G.paused = false;
+  closeOverlay("pauseOverlay");
+  boardEl.classList.remove("blur");
+  updateHint();
+  G.raf = requestAnimationFrame(tickLoop);
+}
+function quitRound() {
+  if (G) { G.running = false; cancelAnimationFrame(G.raf); }
+  clearCountdown();
+  closeOverlay("pauseOverlay");
+  closeOverlay("resultOverlay");
+  closeOverlay("countdown");
+  trainScreen.classList.remove("on");
+  document.body.classList.remove("locked");
+  colorChip.classList.remove("on");
+  renderHome();
+}
+
+/* ---------------- 结算 ---------------- */
+function finishRound() {
+  G.running = false;
+  cancelAnimationFrame(G.raf);
+  const t = Math.max(1, Math.round(performance.now() - G.startTs - G.pausedTotal));
+  G.elapsed = t;
+
+  const key = G.size + "-" + G.mode;
+  const prevBest = bestOf(key);
+  const rec = { t, e: G.errors, ts: Date.now() };
+
+  if (!DB.recs[key]) DB.recs[key] = [];
+  DB.recs[key].push(rec);
+  if (DB.recs[key].length > 80) DB.recs[key] = DB.recs[key].slice(-80);
+  DB.totals.sessions++;
+  DB.totals.ms += t;
+  saveDB(true);
+
+  const isRec = prevBest === null || t < prevBest;
+  const newBest = isRec ? t : prevBest;
+
+  // 结算面板
+  const badge = $("#recBadge");
+  badge.style.cssText = "";
+  if (isRec) {
+    badge.className = "badge";
+    badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.4 4.6 9 10 3.4" stroke="#0e9f60" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>新纪录';
+  } else if (prevBest !== null) {
+    const diff = t - prevBest;
+    badge.className = "badge";
+    badge.style.background = diff > 0 ? "#f2f3f7" : "var(--ok-soft)";
+    badge.style.color = diff > 0 ? "#6b7280" : "#0e9f60";
+    badge.textContent = diff === 0 ? "追平最佳成绩" : "比最佳慢 " + fmt(diff) + "s";
+  } else { badge.className = ""; badge.innerHTML = ""; }
+
+  const rt = $("#resTime");
+  rt.className = "res-time" + (isRec ? " isrec" : "");
+  rt.innerHTML = fmt(t) + "<small>s</small>";
+  $("#resSub").textContent = G.size + "×" + G.size + " · " + MODES[G.mode].name + " · 共 " + G.order.length + " 格";
+  $("#resErr").textContent = G.errors;
+  $("#resAvg").textContent = (t / G.order.length / 1000).toFixed(2);
+  $("#resBest").textContent = fmt(newBest);
+
+  SFX.finish();
+  vibrate([26, 55, 26, 55, 90]);
+
+  setTimeout(() => {
+    $("#resultOverlay").classList.add("on");
+    trainScreen.classList.remove("on");
+    document.body.classList.remove("locked");
+    updateTimer();
+  }, 260);
+}
+
+/* ---------------- 记录 / 统计 ---------------- */
+function renderStatSegs() {
+  const sz = $("#statSize"), md = $("#statMode");
+  sz.innerHTML = "";
+  for (let i = 3; i <= 7; i++) {
+    const b = document.createElement("button");
+    b.textContent = i + "×" + i;
+    b.dataset.size = i;
+    b.className = DB.statsSel.size === i ? "on" : "";
+    sz.appendChild(b);
+  }
+  md.innerHTML = "";
+  for (const k of MODE_KEYS) {
+    const b = document.createElement("button");
+    b.textContent = MODES[k].name;
+    b.dataset.mode = k;
+    b.className = DB.statsSel.mode === k ? "on" : "";
+    md.appendChild(b);
+  }
+}
+
+function renderStats() {
+  renderStatSegs();
+  const key = DB.statsSel.size + "-" + DB.statsSel.mode;
+  const recs = (DB.recs[key] || []).slice();
+
+  $("#totalsLine").textContent = "累计 " + DB.totals.sessions + " 次 · " + fmt(DB.totals.ms) + " 秒";
+
+  // 摘要
+  const sum = $("#summary");
+  if (!recs.length) {
+    sum.innerHTML = '<div class="sum hero"><b>--<em>s</em></b><span>该组合还没有训练记录</span><span class="delta">选好规格与模式后开始训练吧</span></div>';
+  } else {
+    const times = recs.map((r) => r.t);
+    const best = Math.min(...times);
+    const last = times[times.length - 1];
+    const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    const avgErr = recs.reduce((a, b) => a + b.e, 0) / recs.length;
+    let deltaHtml = "";
+    if (recs.length >= 2) {
+      const early = times.slice(0, Math.min(5, times.length));
+      const earlyAvg = early.reduce((a, b) => a + b, 0) / early.length;
+      const d = last - earlyAvg;
+      if (times.length >= 6) {
+        deltaHtml = '<span class="delta ' + (d > 0 ? "up" : "down") + '">最近一次比最初平均' +
+          (d > 0 ? "慢 " : "快 ") + Math.abs(d / 1000).toFixed(2) + "s</span>";
+      }
+    }
+    sum.innerHTML =
+      '<div class="sum hero"><b>' + fmt(best) + '<em>s</em></b><span>历史最佳 · ' + DB.statsSel.size + '×' + DB.statsSel.size + ' ' + MODES[DB.statsSel.mode].name + '</span>' + deltaHtml + '</div>' +
+      '<div class="sum"><b>' + fmt(last) + '<em>s</em></b><span>最近一次</span></div>' +
+      '<div class="sum"><b>' + fmt(avg) + '<em>s</em></b><span>平均用时</span></div>' +
+      '<div class="sum"><b>' + avgErr.toFixed(2) + '</b><span>平均错误次数</span></div>' +
+      '<div class="sum"><b>' + recs.length + '</b><span>训练次数</span></div>';
+  }
+
+  renderChart(recs);
+  renderRecList(recs);
+}
+
+function renderRecList(recs) {
+  const el = $("#recList");
+  $("#listHint").textContent = recs.length ? "共 " + recs.length + " 条，最近 30 条" : "";
+  if (!recs.length) {
+    el.innerHTML = '<div class="empty"><span class="big">📋</span>暂无记录</div>';
+    return;
+  }
+  const best = Math.min(...recs.map((r) => r.t));
+  const view = recs.slice(-30).reverse();
+  const total = recs.length;
+  let html = "";
+  view.forEach((r, i) => {
+    const realIdx = total - i;
+    const isBest = r.t === best;
+    html += '<div class="ritem">' +
+      '<span class="idx' + (isBest ? " best" : "") + '">' + realIdx + '</span>' +
+      '<span class="info"><b>' + fmt(r.t) + 's' + (isBest ? ' · 最佳' : '') + '</b>' +
+      '<span>' + fmtDate(r.ts) + ' · 平均 ' + (r.t / (DB.statsSel.size * DB.statsSel.size) / 1000).toFixed(2) + 's/格</span></span>' +
+      '<span class="err' + (r.e > 0 ? " has" : "") + '">' + (r.e > 0 ? "错 " + r.e : "全对") + '</span>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+/* 内联 SVG 折线图（无外部依赖） */
+function renderChart(recs) {
+  const host = $("#chart");
+  const hint = $("#chartHint");
+  if (!recs.length) {
+    host.innerHTML = '<div class="empty"><span class="big">📈</span>完成一次训练后<br>这里会显示成绩变化趋势</div>';
+    hint.textContent = "";
+    return;
+  }
+  const data = recs.slice(-30);
+  hint.textContent = (data.length < recs.length ? "最近 30 次" : "全部 " + data.length + " 次") + " · 线越低越快";
+
+  const W = Math.max(260, host.clientWidth || host.parentElement.clientWidth || 300);
+  const H = 176;
+  const padL = 42, padR = 12, padT = 16, padB = 26;
+  const iw = W - padL - padR, ih = H - padT - padB;
+
+  const times = data.map((r) => r.t);
+  let min = Math.min(...times), max = Math.max(...times);
+  if (max - min < 600) { const c = (max + min) / 2; min = c - 300; max = c + 300; }
+  const span = max - min, padv = span * 0.16;
+  min = Math.max(0, min - padv); max = max + padv;
+  const best = Math.min(...times);
+
+  const X = (i) => padL + (data.length === 1 ? iw / 2 : (iw * i) / (data.length - 1));
+  const Y = (v) => padT + ih * (1 - (v - min) / (max - min));
+
+  const color = "#2f6bff";
+  let g = "";
+
+  // 网格 + Y 轴刻度
+  for (let k = 0; k <= 3; k++) {
+    const v = min + (max - min) * (k / 3);
+    const y = Y(v);
+    g += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1) +
+         '" stroke="#eef0f4" stroke-width="1"/>';
+    g += '<text x="' + (padL - 8) + '" y="' + (y + 3.5).toFixed(1) +
+         '" text-anchor="end" font-size="10.5" fill="#a7aeb9" font-family="inherit">' + (v / 1000).toFixed(1) + 's</text>';
+  }
+
+  // 最佳成绩虚线
+  const by = Y(best);
+  g += '<line x1="' + padL + '" y1="' + by.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + by.toFixed(1) +
+       '" stroke="#12b76a" stroke-width="1.2" stroke-dasharray="4 4" opacity=".65"/>';
+  g += '<text x="' + (W - padR) + '" y="' + (by - 6).toFixed(1) +
+       '" text-anchor="end" font-size="10" fill="#12b76a" font-weight="600" font-family="inherit">最佳 ' + (best / 1000).toFixed(2) + 's</text>';
+
+  // 折线 + 面积
+  const pts = data.map((r, i) => [X(i), Y(r.t)]);
+  const linePath = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  const areaPath = linePath + " L" + pts[pts.length - 1][0].toFixed(1) + " " + (padT + ih) +
+                   " L" + pts[0][0].toFixed(1) + " " + (padT + ih) + " Z";
+
+  g += '<defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">' +
+       '<stop offset="0%" stop-color="' + color + '" stop-opacity=".18"/>' +
+       '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>';
+  g += '<path d="' + areaPath + '" fill="url(#ga)"/>';
+  g += '<path d="' + linePath + '" fill="none" stroke="' + color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+
+  // 数据点（点少时全部显示，点多时只显示首尾与最佳）
+  const showAll = data.length <= 14;
+  data.forEach((r, i) => {
+    const isBest = r.t === best;
+    if (!showAll && !isBest && i !== 0 && i !== data.length - 1) return;
+    const x = pts[i][0], y = pts[i][1];
+    g += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (isBest ? 4 : 3) + '" fill="#fff" stroke="' +
+         (isBest ? "#12b76a" : color) + '" stroke-width="2"/>';
+  });
+
+  // X 轴说明
+  g += '<text x="' + padL + '" y="' + (H - 8) + '" font-size="10.5" fill="#a7aeb9" font-family="inherit">第 ' + (recs.length - data.length + 1) + ' 次</text>';
+  g += '<text x="' + (W - padR) + '" y="' + (H - 8) + '" text-anchor="end" font-size="10.5" fill="#a7aeb9" font-family="inherit">第 ' + recs.length + ' 次</text>';
+
+  host.innerHTML = '<svg width="100%" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" role="img">' + g + '</svg>';
+}
+
+/* ---------------- 首页渲染 ---------------- */
+function renderHome() {
+  document.querySelectorAll("#sizeSeg button").forEach((b) => {
+    b.classList.toggle("on", +b.dataset.size === DB.prefs.size);
+  });
+  document.querySelectorAll("#modeList .mode").forEach((b) => {
+    b.classList.toggle("on", b.dataset.mode === DB.prefs.mode);
+  });
+  $("#optFixation").checked = !!DB.prefs.fixation;
+  $("#optHint").checked = !!DB.prefs.hint;
+  $("#optSound").checked = !!DB.prefs.sound;
+  $("#optVibrate").checked = !!DB.prefs.vibrate;
+
+  const b = bestOf(DB.prefs.size + "-" + DB.prefs.mode);
+  const chip = $("#bestChip");
+  if (b !== null) { chip.style.display = ""; chip.textContent = "最佳 " + fmt(b) + "s"; }
+  else { chip.style.display = "none"; }
+}
+
+/* ---------------- 切页 ---------------- */
+function switchView(v) {
+  document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.id === "view-" + v));
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
+  if (v === "stats") renderStats();
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+/* ---------------- 事件绑定 ---------------- */
+function bind() {
+  document.querySelectorAll(".tabs button").forEach((b) => {
+    b.addEventListener("click", () => switchView(b.dataset.view));
+  });
+
+  $("#sizeSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.size = +b.dataset.size;
+    saveDB();
+    renderHome();
+  });
+
+  $("#modeList").addEventListener("click", (e) => {
+    const b = e.target.closest(".mode");
+    if (!b) return;
+    DB.prefs.mode = b.dataset.mode;
+    saveDB();
+    renderHome();
+  });
+
+  const optMap = { optFixation: "fixation", optHint: "hint", optSound: "sound", optVibrate: "vibrate" };
+  Object.keys(optMap).forEach((id) => {
+    $("#" + id).addEventListener("change", (e) => {
+      DB.prefs[optMap[id]] = e.target.checked;
+      saveDB();
+      if (id === "optSound" && e.target.checked) { audioCtx(); SFX.ok(); }
+      if (id === "optVibrate" && e.target.checked) vibrate(20);
+    });
+  });
+
+  $("#btnStart").addEventListener("click", () => { audioCtx(); startRound(); });
+
+  $("#btnPause").addEventListener("click", pauseRound);
+  $("#btnQuit").addEventListener("click", quitRound);
+  $("#btnResume").addEventListener("click", resumeRound);
+  $("#btnRestart").addEventListener("click", () => { clearCountdown(); quitRound(); setTimeout(startRound, 60); });
+  $("#btnQuit2").addEventListener("click", quitRound);
+  $("#btnAgain").addEventListener("click", () => {
+    closeOverlay("resultOverlay");
+    setTimeout(startRound, 40);
+  });
+  $("#btnBack").addEventListener("click", () => { closeOverlay("resultOverlay"); renderHome(); });
+
+  $("#statSize").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.statsSel.size = +b.dataset.size;
+    saveDB();
+    renderStats();
+  });
+  $("#statMode").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.statsSel.mode = b.dataset.mode;
+    saveDB();
+    renderStats();
+  });
+
+  $("#btnClear").addEventListener("click", () => {
+    if (!confirm("确定要清空全部训练记录吗？此操作不可撤销。")) return;
+    DB.recs = {};
+    DB.totals = { sessions: 0, ms: 0 };
+    saveDB(true);
+    renderStats();
+  });
+
+  // 键盘：Esc 暂停 / 空格继续
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && G && G.running && !G.paused) { pauseRound(); return; }
+    if (e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();   // 避免空间键激活仍处于焦点的按钮
+      if (G && G.paused) resumeRound();
+    }
+  });
+
+  // 训练中阻止触摸滚动
+  trainScreen.addEventListener("touchmove", (e) => { if (G && !G.paused) e.preventDefault(); }, { passive: false });
+
+  // 窗口尺寸变化
+  let ro = null;
+  if (window.ResizeObserver) {
+    ro = new ResizeObserver(() => { if (G) layoutBoard(); });
+    ro.observe(boardWrap);
+  }
+  let rTimer = null;
+  window.addEventListener("resize", () => {
+    if (G) layoutBoard();
+    clearTimeout(rTimer);
+    rTimer = setTimeout(() => {
+      if ($("#view-stats").classList.contains("on")) renderChart((DB.recs[DB.statsSel.size + "-" + DB.statsSel.mode] || []).slice());
+    }, 160);
+  });
+  window.addEventListener("orientationchange", () => setTimeout(() => { if (G) layoutBoard(); }, 240));
+
+  // 顶栏阴影
+  window.addEventListener("scroll", () => {
+    $("#topbar").classList.toggle("scrolled", window.scrollY > 4);
+  }, { passive: true });
+
+  // 阻止双击缩放
+  let lastTouch = 0;
+  document.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTouch <= 300) e.preventDefault();
+    lastTouch = now;
+  }, { passive: false });
+
+  // 页面隐藏时自动暂停
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && G && G.running && !G.paused) pauseRound();
+  });
+}
+
+/* ---------------- 安卓壳的返回键桥接 ----------------
+   由 WebView 容器（android/ 工程里的 MainActivity）调用。
+   返回 true = 这次返回键已被页面消费，不退出应用；false = 交还系统处理。
+   在普通浏览器里这段代码不会被触发，无副作用。 */
+window.__schulteBack = function () {
+  const p = document.getElementById("pauseOverlay");
+  const r = document.getElementById("resultOverlay");
+  if (r && r.classList.contains("on")) { closeOverlay("resultOverlay"); renderHome(); return true; }
+  if (p && p.classList.contains("on")) return true;          // 暂停中，请用界面上的按钮决定去留
+  if (G && G.running && !G.paused) { pauseRound(); return true; }
+  if (trainScreen.classList.contains("on")) { quitRound(); return true; }
+  return false;
+};
+
+/* ---------------- 启动 ---------------- */
+loadDB();
+renderStorageWarn();
+bind();
+renderHome();
+if ("serviceWorker" in navigator) { /* 无需 SW，本地文件直接可用 */ }
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用图标前景：2×2 方格，与网页版左上角的 logo 一致。
+     画布 108×108，内容只占中央 50×50，稳落在自适应图标的安全区内。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 左上 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,29 H47 A4,4 0 0 1 51,33 V47 A4,4 0 0 1 47,51 H33 A4,4 0 0 1 29,47 V33 A4,4 0 0 1 33,29 Z" />
+
+    <!-- 右上（弱化） -->
+    <path
+        android:fillAlpha="0.5"
+        android:fillColor="#FFFFFF"
+        android:pathData="M61,29 H75 A4,4 0 0 1 79,33 V47 A4,4 0 0 1 75,51 H61 A4,4 0 0 1 57,47 V33 A4,4 0 0 1 61,29 Z" />
+
+    <!-- 左下（弱化） -->
+    <path
+        android:fillAlpha="0.5"
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,57 H47 A4,4 0 0 1 51,61 V75 A4,4 0 0 1 47,79 H33 A4,4 0 0 1 29,75 V61 A4,4 0 0 1 33,57 Z" />
+
+    <!-- 右下 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M61,57 H75 A4,4 0 0 1 79,61 V75 A4,4 0 0 1 75,79 H61 A4,4 0 0 1 57,75 V61 A4,4 0 0 1 61,57 Z" />
+</vector>
