@@ -291,8 +291,13 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
   background:#fff;
   clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
 }
-/* 旋转时把棋盘提升到独立的合成层，否则每帧都要重新栅格化整盘文字 */
-.board.rot{will-change:transform}
+/* 旋转：盘面整体转，但每个数字反向转回来保持正立。
+   角度通过 CSS 变量下发 —— 每帧只写一次 JS，剩下交给合成器，
+   比逐个改 61 个格子的 transform 便宜得多。 */
+.board{--rot:0deg}
+.lbl{display:block}
+.board.rot{transform:rotate(var(--rot));will-change:transform}
+.board.rot .lbl{transform:rotate(calc(var(--rot) * -1));will-change:transform}
 
 .cell{
   position:relative;display:grid;place-items:center;
@@ -1316,6 +1321,19 @@ function layoutBoard() {
   fixDot.style.margin = (-dot / 2) + "px 0 0 " + (-dot / 2) + "px";
 }
 
+/* 数字放在内层 span 里，旋转时靠它反向转回来保持正立。
+   所有改动格子文字的地方都必须走这里，不能直接写 cell.textContent —— 那会把 span 抹掉。 */
+function setCellLabel(cell, label) {
+  let sp = cell.firstElementChild;
+  if (!sp || !sp.classList || !sp.classList.contains("lbl")) {
+    cell.textContent = "";
+    sp = document.createElement("span");
+    sp.className = "lbl";
+    cell.appendChild(sp);
+  }
+  sp.textContent = label;
+}
+
 function renderBoard() {
   boardEl.innerHTML = "";
   boardEl.classList.toggle("hexgrid", G.shape === "hex");
@@ -1324,10 +1342,10 @@ function renderBoard() {
   for (const item of G.board) {
     const b = document.createElement("button");
     b.className = "cell" + (item.color !== "num" ? " c-" + item.color : "");
-    b.textContent = item.label;
     b.dataset.label = item.label;
     b.type = "button";
     b.setAttribute("aria-label", item.label);
+    setCellLabel(b, item.label);
     frag.appendChild(b);
   }
   boardEl.appendChild(frag);
@@ -1406,8 +1424,9 @@ function tickLoop() {
 
   // 整盘旋转：角度由「真实运行时长」反推，不累加。
   // 好处是暂停/掉帧都不会让角度跳变，恢复后接着原来的进度转。
+  // 只写这一个 CSS 变量：盘面转它、数字反向转回去也用它，每帧一次 JS 写入。
   if (G.rot) {
-    boardEl.style.transform = "rotate(" + ((elapsed / G.rotMs) * 360).toFixed(2) + "deg)";
+    boardEl.style.setProperty("--rot", ((elapsed / G.rotMs) * 360).toFixed(2) + "deg");
   }
 
   G.raf = requestAnimationFrame(tickLoop);
@@ -1452,7 +1471,7 @@ function applyMoved(touched) {
     const cell = cells[i];
     if (!cell) continue;
     const item = G.board[i];
-    cell.textContent = item.label;
+    setCellLabel(cell, item.label);
     cell.dataset.label = item.label;
     cell.setAttribute("aria-label", item.label);
     // 用增量方式改类名，不要整体赋值 —— 整体赋值会顺带抹掉 .done / .wrong 等状态
@@ -1574,7 +1593,7 @@ function startRound() {
   memChip.textContent = "记忆 " + (G.memMs / 1000).toFixed(1);
   hintPill.className = "hintpill";
   fixDot.classList.toggle("on", !!DB.prefs.fixation);   // 注视点开关此前一直没接到界面上
-  boardEl.style.transform = "";                          // 上一局的旋转角不复用
+  boardEl.style.setProperty("--rot", "0deg");            // 上一局的旋转角不复用
   boardEl.classList.remove("blur", "blind");
   closeOverlay("pauseOverlay");
   closeOverlay("resultOverlay");
@@ -1682,7 +1701,7 @@ function quitRound() {
   clearCountdown();
   clearSetTimer();
   if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
-  boardEl.style.transform = "";
+  boardEl.style.setProperty("--rot", "0deg");
   SET = { total: 1, index: 0, times: [] };
   closeOverlay("pauseOverlay");
   closeOverlay("resultOverlay");
