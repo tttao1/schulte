@@ -291,6 +291,11 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
   background:#fff;
   clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
 }
+/* 平顶六边形：同一批格子换个切法。竖屏手机上这种朝向的蜂窝更窄更高，
+   能把屏幕的纵向空间用起来，格子明显更大。朝向由 layoutBoard 自动选。 */
+.board.hexgrid.flat .cell{
+  clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);
+}
 /* 旋转：盘面整体转，但每个数字反向转回来保持正立。
    角度通过 CSS 变量下发 —— 每帧只写一次 JS，剩下交给合成器，
    比逐个改 61 个格子的 transform 便宜得多。 */
@@ -1089,7 +1094,6 @@ function variantsWithRecords(bid, mode, seq) {
    方形：N×N（N = 3..7），共 N² 格
    蜂窝：同心六边形，半径 R 圈（1..4），共 3R²+3R+1 格 = 7 / 19 / 37 / 61 */
 const SHAPES = ["square", "hex"];
-const HEX_HW = 2 / Math.sqrt(3);          // 尖顶六边形的 高/宽 = 2/√3 ≈ 1.1547
 
 function hexCount(R) { return 3 * R * R + 3 * R + 1; }
 
@@ -1218,12 +1222,17 @@ function buildRound(n, mode, seq) {
   }
 
   // 最长标签位数（决定字号上限：1 位数可以放得更大）
-  let maxLen = 1;
-  for (const it of labels) if (it.label.length > maxLen) maxLen = it.label.length;
+  // 另外记下有没有字母：数字平均 0.56em 宽，字母要 0.62~0.95em，
+  // 纯数字的局面可以把字宽预算放宽一档，字能再大一圈。
+  let maxLen = 1, allNum = true;
+  for (const it of labels) {
+    if (it.label.length > maxLen) maxLen = it.label.length;
+    if (/[A-Za-z]/.test(it.label)) allNum = false;
+  }
 
   // 打乱摆放位置（点击顺序仍是 order）
   const board = shuffle(labels);
-  return { mode, n, order, board, maxLen };
+  return { mode, n, order, board, maxLen, allNum };
 }
 
 /* ---------------- 运行时状态 ---------------- */
@@ -1246,44 +1255,68 @@ const setBtnLabel = $("#setBtnLabel");
 
 function layoutBoard() {
   if (!G) return;
-  // 注意 max 要放在最后：容器在隐藏状态下 clientHeight 为 0，
-  // 若先抬到 140 再算，棋盘会算出比容器还大的尺寸并压到进度条上。
-  // 系数取 1：边距已经靠 trainScreen 的 padding 留出来了，这里不再二次缩水。
-  const avail = Math.max(60, Math.min(boardWrap.clientWidth, boardWrap.clientHeight));
+  const W = boardWrap.clientWidth, H = boardWrap.clientHeight;
+  if (W < 40 || H < 40) return;   // 训练层隐藏时量不到尺寸，等显示出来再排
 
-  // 棋盘的自然尺寸（相对单位）
-  let natW = 1, natH = 1;
-  if (G.shape === "hex") {
-    natW = 2 * G.ring + 1;
-    natH = HEX_HW * (1.5 * G.ring + 1);
-  }
-  // 旋转时棋盘会扫出一个直径等于对角线的圆，必须按对角线卡进可用空间，否则边角会被切掉。
-  // 代价是棋盘整体缩到约 70%，这是旋转的固有开销。
-  const k = G.rot
-    ? avail / Math.sqrt(natW * natW + natH * natH)
-    : avail / Math.max(natW, natH);
-  const bw = natW * k, bh = natH * k;
-  boardEl.style.width = bw.toFixed(1) + "px";
-  boardEl.style.height = bh.toFixed(1) + "px";
-
+  const SQ3 = Math.sqrt(3);
   const maxLen = G.maxLen || String(G.n).length;
   const cells = boardEl.children;
+  let bw, bh;
 
   if (G.shape === "hex") {
+    const R = G.ring;
+    /* 同一批格子有两种朝向，外接矩形互为转置：
+         尖顶格（上下是尖、左右是竖边）：宽 (2R+1)√3 s，高 (3R+2)s   —— 比高更宽
+         平顶格（上下是平边、左右是尖）：宽 (3R+2)s，高 (2R+1)√3 s   —— 比宽更高
+       s 是六边形外接圆半径。竖屏手机宽度最紧张，选平顶能把格子撑大约 10%；
+       横屏和电脑反过来，选尖顶更划算。两种都算一遍，谁给的空间大用谁。
+       注：开旋转时两者的对角线一样长（互为转置），会固定落在尖顶，属预期。 */
+    const dims = [
+      { flat: false, w: (2 * R + 1) * SQ3, h: 3 * R + 2 },
+      { flat: true,  w: 3 * R + 2,         h: (2 * R + 1) * SQ3 }
+    ];
+    let s = -1, flat = false;
+    for (const d of dims) {
+      // 旋转时棋盘会扫出一个直径等于外接矩形对角线的圆，必须按对角线卡，否则边角会被切掉。
+      // 代价是棋盘整体缩到约 70%，这是旋转的固有开销。
+      const cand = G.rot
+        ? Math.min(W, H) / Math.sqrt(d.w * d.w + d.h * d.h)
+        : Math.min(W / d.w, H / d.h);
+      if (cand > s) { s = cand; flat = d.flat; bw = d.w * s; bh = d.h * s; }
+    }
+    boardEl.classList.toggle("flat", flat);
     boardEl.style.gridTemplateColumns = "";
     boardEl.style.gridTemplateRows = "";
     boardEl.style.gap = "";
     boardEl.style.fontSize = "";
-    const wp = bw / (2 * G.ring + 1);       // 相邻两列的水平间距
-    const hp = wp * HEX_HW;                 // 相邻两行的垂直间距
-    const cw = wp * 0.94, ch = hp * 0.94;   // 收一点，格与格之间留缝
-    let fs = cw * (maxLen <= 1 ? 0.54 : 0.46);
-    if (maxLen > 1) fs = Math.min(fs, (cw * 0.86) / (maxLen * 0.62));
-    fs = Math.min(fs, 160);
+    boardEl.style.width = bw.toFixed(1) + "px";
+    boardEl.style.height = bh.toFixed(1) + "px";
+
+    const sh = 0.975;             // 只留很窄的缝，格与格之间仍能看出边界
+    const cw = (flat ? 2 * s : SQ3 * s) * sh;
+    const ch = (flat ? SQ3 * s : 2 * s) * sh;
+    /* 字号按「六边形内能塞下的最大矩形」反推，而不是拍一个比例：
+       六边形越靠近上下两端越窄，所以文字块越高、可用宽度反而越小。
+       尖顶：fs ≤ 2w / (k·n + 1.992)    平顶：fs ≤ w / (k·n + 0.664)
+       n 是最长标签的字符数；k 是每个字符的宽度预算 —— 纯数字局面 0.58 就够，
+       只有「字母数字」模式出现 A~AD 这类字母时才需要放宽到 0.62。
+       最后再乘一道安全边，避免字体回退时把格子顶破。 */
+    const kw = G.allNum ? 0.58 : 0.62;
+    const safe = G.allNum ? 0.90 : 0.85;
+    let fs = (flat ? cw / (kw * maxLen + 0.664)
+                   : (2 * cw) / (kw * maxLen + 1.992)) * safe;
+    fs = Math.min(fs, ch * 0.62, 160);   // 格子特别大时别让字撑满整格，留点呼吸
+
     for (let i = 0; i < cells.length; i++) {
       const p = G.hexPos[i] || { q: 0, r: 0 };
-      const cx = (G.ring + p.q + p.r / 2 + 0.5) * wp;
-      const cy = (0.75 * (G.ring + p.r) + 0.5) * hp;
+      let cx, cy;
+      if (flat) {
+        cx = s * (1.5 * (p.q + R) + 1);
+        cy = SQ3 * s * (p.r + p.q / 2 + R + 0.5);
+      } else {
+        cx = SQ3 * s * (R + p.q + p.r / 2 + 0.5);
+        cy = s * (1.5 * (R + p.r) + 1);
+      }
       const c = cells[i];
       c.style.width = cw.toFixed(1) + "px";
       c.style.height = ch.toFixed(1) + "px";
@@ -1295,12 +1328,20 @@ function layoutBoard() {
 
   } else {
     const N = G.dim;
+    const avail = Math.min(W, H);
+    const k = G.rot ? avail / Math.SQRT2 : avail;
+    bw = k; bh = k;
+    boardEl.classList.remove("flat");
+    boardEl.style.width = bw.toFixed(1) + "px";
+    boardEl.style.height = bh.toFixed(1) + "px";
+
     const gap = Math.max(3, Math.min(10, bw * 0.011));
     const radius = Math.max(7, Math.min(16, (bw / N) * 0.19));
     // 字号按「实际格子宽度」算；再用最长标签的占宽做一次安全收敛，避免两位数顶到格边
     const cellW = (bw - gap * (N - 1)) / N;
-    let fs = cellW * (maxLen <= 1 ? 0.60 : N >= 7 ? 0.56 : 0.58);
-    if (maxLen > 1) fs = Math.min(fs, (cellW * 0.86) / (maxLen * 0.62));
+    let fs = cellW * (maxLen <= 1 ? 0.64 : 0.60);
+    // 两位数还要过一次占宽校验：混了字母时每个字符按 0.62em 估，纯数字 0.58em
+    if (maxLen > 1) fs = Math.min(fs, (cellW * 0.88) / (maxLen * (G.allNum ? 0.58 : 0.62)));
     fs = Math.min(fs, 160);
     boardEl.style.gridTemplateColumns = "repeat(" + N + ",1fr)";
     boardEl.style.gridTemplateRows = "repeat(" + N + ",1fr)";
@@ -1555,6 +1596,7 @@ function startRound() {
     bid: bd.id, boardLabel: bd.label, n: bd.n,
     mode, seq: sq,
     maxLen: round.maxLen,
+    allNum: round.allNum,
     order: round.order,
     board: round.board,
     hexPos: bd.shape === "hex" ? hexPositions(bd.ring) : null,
@@ -2138,7 +2180,15 @@ function renderHome() {
   });
   const isHex = DB.prefs.shape === "hex";
   buildSizeSeg($("#sizeSeg"), DB.prefs.shape, isHex ? DB.prefs.hexRing : DB.prefs.size);
-  $("#sizeHint").textContent = isHex ? "圈数越多，格子越多" : "数字越多，难度越高";
+  // 蜂窝的圈数和方形的边长不是一个量纲，直接标出「相当于方形多少×多少」，
+  // 免得选了 4 圈才发现它比方形最大的 7×7 还密。
+  if (isHex) {
+    const hc = hexCount(DB.prefs.hexRing);
+    const eq = Math.round(Math.sqrt(hc));
+    $("#sizeHint").textContent = hc + " 格，约等于方形 " + eq + "×" + eq;
+  } else {
+    $("#sizeHint").textContent = "数字越多，难度越高";
+  }
 
   document.querySelectorAll("#modeList .mode").forEach((b) => {
     b.classList.toggle("on", b.dataset.mode === DB.prefs.mode);
