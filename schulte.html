@@ -223,7 +223,7 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 #trainScreen{
   position:fixed;inset:0;z-index:60;background:var(--bg);
   display:none;flex-direction:column;
-  padding:calc(10px + var(--safe-t)) 14px calc(14px + var(--safe-b));
+  padding:calc(6px + var(--safe-t)) 6px calc(8px + var(--safe-b));
 }
 #trainScreen.on{display:flex;animation:fadeIn .22s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -264,7 +264,7 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 .memchip.warn{color:var(--err);border-color:#f8c9c4}
 
 .progressbar{
-  height:4px;background:#e5e7ec;border-radius:99px;margin:12px auto 0;overflow:hidden;
+  height:3px;background:#e5e7ec;border-radius:99px;margin:8px auto 0;overflow:hidden;
   flex:none;max-width:640px;width:100%;
 }
 .progressbar i{
@@ -275,7 +275,7 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 
 .board-wrap{
   flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
-  position:relative;margin-top:12px;
+  position:relative;margin-top:8px;
 }
 .board{
   display:grid;position:relative;
@@ -366,12 +366,14 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
   pointer-events:none;display:none;z-index:3;
 }
 .fixdot.on{display:block}
+/* 提示条排在棋盘上方、占自己的一行，不再浮在棋盘中央挡格子。
+   align-self:center 让它在纵向 flex 里按内容宽度居中。 */
 .hintpill{
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  margin-top:34px;padding:7px 15px;border-radius:99px;background:rgba(255,255,255,.94);
-  box-shadow:var(--shadow);border:1px solid var(--line);
-  font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;
-  display:none;z-index:4;backdrop-filter:blur(6px);
+  align-self:center;flex:none;
+  margin:8px 0 0;padding:6px 15px;border-radius:99px;background:#fff;
+  box-shadow:var(--shadow-sm);border:1px solid var(--line);
+  font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;
+  display:none;
 }
 .hintpill.on{display:block}
 .hintpill .k{font-weight:600;color:var(--muted);font-size:.72em;letter-spacing:0;margin-right:4px}
@@ -740,10 +742,10 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
     </button>
   </div>
   <div class="progressbar"><i id="progressFill"></i></div>
+  <div class="hintpill" id="hintPill"></div>
   <div class="board-wrap" id="boardWrap">
     <div class="board" id="board"></div>
     <div class="fixdot" id="fixDot"></div>
-    <div class="hintpill" id="hintPill"></div>
   </div>
 </div>
 
@@ -1246,7 +1248,8 @@ function layoutBoard() {
   if (!G) return;
   // 注意 max 要放在最后：容器在隐藏状态下 clientHeight 为 0，
   // 若先抬到 140 再算，棋盘会算出比容器还大的尺寸并压到进度条上。
-  const avail = Math.max(60, Math.min(boardWrap.clientWidth, boardWrap.clientHeight) * 0.97);
+  // 系数取 1：边距已经靠 trainScreen 的 padding 留出来了，这里不再二次缩水。
+  const avail = Math.max(60, Math.min(boardWrap.clientWidth, boardWrap.clientHeight));
 
   // 棋盘的自然尺寸（相对单位）
   let natW = 1, natH = 1;
@@ -1273,9 +1276,9 @@ function layoutBoard() {
     boardEl.style.fontSize = "";
     const wp = bw / (2 * G.ring + 1);       // 相邻两列的水平间距
     const hp = wp * HEX_HW;                 // 相邻两行的垂直间距
-    const cw = wp * 0.93, ch = hp * 0.93;   // 收一点，格与格之间留缝
-    let fs = cw * (maxLen <= 1 ? 0.48 : 0.40);
-    if (maxLen > 1) fs = Math.min(fs, (cw * 0.84) / (maxLen * 0.62));
+    const cw = wp * 0.94, ch = hp * 0.94;   // 收一点，格与格之间留缝
+    let fs = cw * (maxLen <= 1 ? 0.54 : 0.46);
+    if (maxLen > 1) fs = Math.min(fs, (cw * 0.86) / (maxLen * 0.62));
     fs = Math.min(fs, 160);
     for (let i = 0; i < cells.length; i++) {
       const p = G.hexPos[i] || { q: 0, r: 0 };
@@ -1289,16 +1292,14 @@ function layoutBoard() {
       c.style.fontSize = fs.toFixed(2) + "px";
       c.style.borderRadius = "";
     }
-    hintPill.style.marginTop = Math.max(30, bh * 0.17).toFixed(0) + "px";
-    hintPill.style.fontSize = Math.max(12, Math.min(18, cw * 0.5)).toFixed(1) + "px";
 
   } else {
     const N = G.dim;
-    const gap = Math.max(3, Math.min(11, bw * 0.013));
+    const gap = Math.max(3, Math.min(10, bw * 0.011));
     const radius = Math.max(7, Math.min(16, (bw / N) * 0.19));
     // 字号按「实际格子宽度」算；再用最长标签的占宽做一次安全收敛，避免两位数顶到格边
     const cellW = (bw - gap * (N - 1)) / N;
-    let fs = cellW * (maxLen <= 1 ? 0.56 : N >= 7 ? 0.52 : 0.54);
+    let fs = cellW * (maxLen <= 1 ? 0.60 : N >= 7 ? 0.56 : 0.58);
     if (maxLen > 1) fs = Math.min(fs, (cellW * 0.86) / (maxLen * 0.62));
     fs = Math.min(fs, 160);
     boardEl.style.gridTemplateColumns = "repeat(" + N + ",1fr)";
@@ -1311,8 +1312,6 @@ function layoutBoard() {
       c.style.width = ""; c.style.height = "";
       c.style.left = ""; c.style.top = ""; c.style.fontSize = "";
     }
-    hintPill.style.marginTop = (bw * 0.085).toFixed(0) + "px";
-    hintPill.style.fontSize = Math.max(13, Math.min(19, bw * 0.036)).toFixed(1) + "px";
   }
 
   const dot = Math.max(7, Math.min(12, Math.min(bw, bh) * 0.02));
@@ -1365,13 +1364,18 @@ function updateHint() {
   } else {
     colorChip.classList.remove("on");
   }
-  // 中央提示
+  // 目标提示。它现在排在棋盘上方、占自己的一行，
+  // 出现或消失会改变棋盘可用高度 —— 状态一变就必须重排，否则棋盘会顶到提示条上。
   if (DB.prefs.hint) {
     hintPill.className = "hintpill on" + (cur.color !== "num" ? " c-" + cur.color : "");
     hintPill.innerHTML = '<span class="k">下一个</span>' + cur.label;
   } else {
     hintPill.className = "hintpill";
     hintPill.innerHTML = "";
+  }
+  if (!!DB.prefs.hint !== G.pillShown) {
+    G.pillShown = !!DB.prefs.hint;
+    layoutBoard();
   }
   progressFill.style.width = ((1 - remaining / total) * 100).toFixed(1) + "%";
   progressFill.style.opacity = G.running ? "1" : "0";
@@ -1566,6 +1570,7 @@ function startRound() {
     memMs: DB.prefs.memory ? DB.prefs.memSec * 1000 : 0,
     memShown: "",
     blind: false,
+    pillShown: false,    // 目标提示条当前是否占着一行
     setIndex: SET.index,
     setTotal: SET.total,
     idx: 0,
