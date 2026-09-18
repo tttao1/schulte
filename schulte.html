@@ -54,7 +54,8 @@ body{
   overscroll-behavior:none;
 }
 body.locked{overflow:hidden}
-button{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+button{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
+label,.track,.mode,.seg button{touch-action:manipulation}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:#d7dae1;border-radius:8px}
 
@@ -124,6 +125,15 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 }
 .seg button.on small{color:#7ba0ff}
 
+/* 紧凑分段控件：用于「换位节奏」这类次级选项 */
+.pillseg{display:flex;gap:3px;background:#f2f3f7;border-radius:10px;padding:3px;flex:none}
+.pillseg button{
+  padding:6px 13px;border-radius:8px;font-size:13px;font-weight:650;color:var(--text2);
+  transition:background .16s,color .16s,box-shadow .16s,transform .14s;
+}
+.pillseg button:active{transform:scale(.94)}
+.pillseg button.on{background:#fff;color:var(--accent);box-shadow:var(--shadow-sm)}
+
 /* ---------------- 模式选择 ---------------- */
 .modes{display:flex;flex-direction:column;gap:8px}
 .mode{
@@ -154,6 +164,9 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 /* ---------------- 开关 ---------------- */
 .row{display:flex;align-items:center;gap:14px;padding:11px 2px}
 .row+.row{border-top:1px solid var(--line-soft)}
+/* 次级选项：浅底圆角，表示从属于上方那个开关（必须排在 .row+.row 之后才盖得住） */
+.row.sub{background:#fafbfc;border-radius:11px;padding:9px 12px;margin:0 0 4px;border-top:0}
+.row.sub .rt b{font-size:14px}
 .row .rt{flex:1;min-width:0}
 .row .rt b{display:block;font-size:14.5px;font-weight:600;letter-spacing:-.01em}
 .row .rt span{display:block;font-size:12px;color:var(--muted);margin-top:1px;line-height:1.4}
@@ -241,6 +254,15 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 .colorchip i{width:9px;height:9px;border-radius:50%;background:var(--alt1);flex:none}
 .colorchip.blue i{background:var(--alt2)}
 
+/* 记忆模式的读秒提示 */
+.memchip{
+  display:none;align-items:center;font-size:11.5px;font-weight:700;
+  padding:3px 9px;border-radius:99px;background:#fff;border:1px solid var(--line);
+  color:#7a5af8;flex:none;font-variant-numeric:tabular-nums;
+}
+.memchip.on{display:flex}
+.memchip.warn{color:var(--err);border-color:#f8c9c4}
+
 .progressbar{
   height:4px;background:#e5e7ec;border-radius:99px;margin:12px auto 0;overflow:hidden;
   flex:none;max-width:640px;width:100%;
@@ -261,6 +283,17 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 }
 .board.blur{filter:blur(14px);opacity:.35;pointer-events:none}
 
+/* 蜂窝棋盘：格子脱离网格改成绝对定位，靠 clip-path 切成尖顶六边形。
+   六边形描边会被 clip-path 裁掉，所以去掉边框和投影，格与格的区分靠留缝。 */
+.board.hexgrid{display:block}
+.board.hexgrid .cell{
+  position:absolute;border:0;box-shadow:none;
+  background:#fff;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+/* 旋转时把棋盘提升到独立的合成层，否则每帧都要重新栅格化整盘文字 */
+.board.rot{will-change:transform}
+
 .cell{
   position:relative;display:grid;place-items:center;
   background:#fff;border:1px solid var(--line);
@@ -279,6 +312,10 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
   background:var(--accent-soft);border-color:#d4e0ff;color:#a8bcf0;
   box-shadow:none;opacity:.62;pointer-events:none;transform:none;
 }
+/* 蜂窝里 .board.hexgrid .cell 的特异性更高，会盖掉 .done 的底色，这里补回来 */
+.board.hexgrid .cell.done{background:var(--accent-soft)}
+.board.hexgrid .cell.wrong{background:var(--err-soft)}
+.board.hexgrid .cell.moved{animation:movedPulse .46s ease-out}
 .cell.pop{animation:pop .22s cubic-bezier(.3,1.5,.5,1)}
 @keyframes pop{
   0%{transform:scale(.9)}
@@ -294,6 +331,26 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
   20%,80%{transform:translateX(4px)}
   30%,50%,70%{transform:translateX(-6px)}
   40%,60%{transform:translateX(6px)}
+}
+
+/* 记忆模式：数字隐藏后，用一个小色点保留「这格属于哪一组」的信息，
+   否则橙蓝交替 / 颜色分组在隐藏状态下就没法玩了 */
+.board.blind .cell{color:transparent!important}
+.board.blind .cell::after{
+  content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;
+  margin:-4.5px 0 0 -4.5px;border-radius:50%;
+  opacity:0;transition:opacity .35s ease .1s;
+}
+.board.blind .cell.c-alt1::after{background:var(--alt1);opacity:1}
+.board.blind .cell.c-alt2::after{background:var(--alt2);opacity:1}
+.board.blind .cell.c-alpha::after{background:#7a5af8;opacity:1}
+.board.blind .cell.done::after{opacity:.28}
+
+/* 动态模式：换位时的一道很淡的脉冲，只做「这里刚变过」的暗示，不抢注意力 */
+.cell.moved{animation:movedPulse .46s ease-out}
+@keyframes movedPulse{
+  0%{background:#edf2ff;border-color:#d3e0ff}
+  100%{background:#fff;border-color:var(--line)}
 }
 
 /* 中央注视点 */
@@ -331,8 +388,13 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 .overlay.on{display:flex;animation:fadeIn .22s ease}
 
 /* 倒计时 */
-/* 倒计时期间方格只保留自身模糊，便于「看到但看不清」*/
-#countdown{background:rgba(244,245,247,.38);backdrop-filter:none;-webkit-backdrop-filter:none}
+/* 倒计时期间方格只保留自身模糊，便于「看到但看不清」。
+   pointer-events:none 是为了让倒计时遮罩不吃点击 —— 否则这 2.5 秒里
+   暂停和退出按钮都点不动。 */
+#countdown{
+  background:rgba(244,245,247,.38);backdrop-filter:none;-webkit-backdrop-filter:none;
+  pointer-events:none;
+}
 .cd-num{
   font-size:clamp(90px,30vw,170px);font-weight:800;letter-spacing:-.05em;color:var(--text);
   line-height:1;animation:cdIn .62s cubic-bezier(.2,.9,.3,1);
@@ -377,6 +439,23 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 .grid3 div{background:#f7f8fa;border-radius:13px;padding:11px 4px}
 .grid3 b{display:block;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .grid3 span{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+
+/* 连训组统计 */
+.setline{
+  margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft);text-align:left;
+}
+.setline .t{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.03em;margin-bottom:9px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.grid4 div{background:#f7f8fa;border-radius:11px;padding:9px 2px;text-align:center}
+.grid4 b{display:block;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.grid4 span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.set-spark{display:flex;align-items:flex-end;gap:4px;height:34px;margin-top:11px}
+.set-spark i{
+  flex:1;border-radius:3px 3px 0 0;background:#c9daff;min-height:3px;
+  transition:height .3s cubic-bezier(.3,.9,.3,1);
+}
+.set-spark i.last{background:var(--accent)}
+.set-spark i.best{background:var(--ok)}   /* 写在后面：某局既是最后一局又是最好时，绿色优先 */
 
 /* ============================================================
    记录 / 统计
@@ -462,14 +541,21 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
     <div id="storageWarn"></div>
 
     <div class="card">
-      <p class="card-title">方格规格 <span class="hint">数字越多，难度越高</span></p>
-      <div class="seg col" id="sizeSeg">
-        <button data-size="3">3×3<small>9格</small></button>
-        <button data-size="4">4×4<small>16格</small></button>
-        <button data-size="5">5×5<small>25格</small></button>
-        <button data-size="6">6×6<small>36格</small></button>
-        <button data-size="7">7×7<small>49格</small></button>
+      <p class="card-title">棋盘形状</p>
+      <div class="seg" id="shapeSeg">
+        <button data-shape="square" style="flex-direction:row;gap:8px;padding:13px 4px">
+          <span>方形</span><small>N×N 格</small>
+        </button>
+        <button data-shape="hex" style="flex-direction:row;gap:8px;padding:13px 4px">
+          <span>蜂窝</span><small>同心六边形</small>
+        </button>
       </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">规格 <span class="hint" id="sizeHint">数字越多，难度越高</span></p>
+      <!-- 内容随形状重建：方形是 3×3~7×7，蜂窝是 1~4 圈（7/19/37/61 格） -->
+      <div class="seg col" id="sizeSeg"></div>
     </div>
 
     <div class="card">
@@ -490,16 +576,87 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
           <span class="tx"><b>橙蓝交替</b><span>橙、蓝两组数字，交替取各组最小者点击</span></span>
           <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         </button>
+        <button class="mode" data-mode="stroop">
+          <span class="ico" style="color:#f04438">◑</span>
+          <span class="tx"><b>颜色分组</b><span>两色数字混排，先点完一组升序，再点另一组</span></span>
+          <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
         <button class="mode" data-mode="mixed">
           <span class="ico" style="color:#7a5af8">1A</span>
           <span class="tx"><b>字母数字</b><span>1 → A → 2 → B，数字与字母交替点击</span></span>
           <span class="tick"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2 4.8 9 10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         </button>
       </div>
+
+      <!-- 数列规则：只对正序 / 倒序生效，其他模式自带顺序规则 -->
+      <div id="seqBlock" style="display:none;margin-top:14px;padding-top:13px;border-top:1px solid var(--line-soft)">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:9px">
+          <b style="font-size:14.5px;font-weight:600;letter-spacing:-.01em">数列规则</b>
+          <span id="seqDesc" style="font-size:12px;color:var(--muted)">其余数字作为干扰项，不点</span>
+        </div>
+        <div class="mini-seg" id="seqSeg"></div>
+      </div>
     </div>
 
     <div class="card">
-      <p class="card-title">训练选项</p>
+      <p class="card-title">玩法难度 <span class="hint">可任意叠加</span></p>
+
+      <div class="row">
+        <span class="rt"><b>动态换位</b><span>随机交换未点数字的位置，打断空间记忆</span></span>
+        <label class="switch"><input type="checkbox" id="optDynamic"><span class="track"></span></label>
+      </div>
+      <div class="row sub" id="dynSpeedRow" style="display:none">
+        <span class="rt"><b>换位节奏</b><span id="dynSpeedDesc">每 1.5 秒交换一次</span></span>
+        <span class="pillseg" id="dynSpeedSeg">
+          <button data-speed="0">慢</button>
+          <button data-speed="1">中</button>
+          <button data-speed="2">快</button>
+        </span>
+      </div>
+
+      <div class="row">
+        <span class="rt"><b>记忆模式</b><span>数字只亮一小会儿，之后凭记忆点击</span></span>
+        <label class="switch"><input type="checkbox" id="optMemory"><span class="track"></span></label>
+      </div>
+      <div class="row sub" id="memSecRow" style="display:none">
+        <span class="rt"><b>记忆时长</b><span id="memSecDesc">数字显示 3 秒后隐藏</span></span>
+        <span class="pillseg" id="memSecSeg">
+          <button data-sec="2">2秒</button>
+          <button data-sec="3">3秒</button>
+          <button data-sec="5">5秒</button>
+        </span>
+      </div>
+
+      <div class="row">
+        <span class="rt"><b>动态旋转</b><span>整个棋盘持续转动，数字也跟着转</span></span>
+        <label class="switch"><input type="checkbox" id="optRot"><span class="track"></span></label>
+      </div>
+      <div class="row sub" id="rotSpeedRow" style="display:none">
+        <span class="rt"><b>旋转速度</b><span id="rotSpeedDesc">60 秒转一圈</span></span>
+        <span class="pillseg" id="rotSpeedSeg">
+          <button data-rot="0">慢</button>
+          <button data-rot="1">中</button>
+          <button data-rot="2">快</button>
+        </span>
+      </div>
+
+      <div class="row">
+        <span class="rt"><b>点击不变暗</b><span>点过的格子与未点外观一致，只能靠记忆；重复点同一格会记为错误</span></span>
+        <label class="switch"><input type="checkbox" id="optNoDim"><span class="track"></span></label>
+      </div>
+
+      <div class="row">
+        <span class="rt"><b>连训局数</b><span id="setDesc">一局一结算</span></span>
+        <span class="pillseg" id="setSeg">
+          <button data-set="1">1</button>
+          <button data-set="3">3</button>
+          <button data-set="5">5</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">辅助与反馈</p>
       <div class="row">
         <span class="rt"><b>中央注视点</b><span>在方格中央固定视线，用余光搜索数字</span></span>
         <label class="switch"><input type="checkbox" id="optFixation"><span class="track"></span></label>
@@ -536,8 +693,11 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
 
     <div class="card">
       <p class="card-title">查看范围</p>
+      <div class="mini-seg" id="statShape" style="margin-bottom:9px"></div>
       <div class="mini-seg" id="statSize" style="margin-bottom:9px"></div>
-      <div class="mini-seg" id="statMode"></div>
+      <div class="mini-seg" id="statMode" style="margin-bottom:9px"></div>
+      <div class="mini-seg" id="statVariant"></div>
+      <div class="mini-seg" id="statSeq" style="display:none;margin-top:9px"></div>
     </div>
 
     <div class="summary" id="summary"></div>
@@ -566,8 +726,9 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
       <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1.3"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1.3"/></svg>
     </button>
     <div class="readout">
-      <span class="timer" id="timerEl"><span id="timerNum">0.00</span><small>s</small></span>
+      <span class="timer" id="timerEl"><span id="timerNum">0.00</span><small id="timerUnit">s</small></span>
       <span class="colorchip" id="colorChip"><i></i><span id="colorChipTx">橙</span></span>
+      <span class="memchip" id="memChip">记忆 3.0</span>
     </div>
     <button class="icon-btn" id="btnQuit" aria-label="退出">
       <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
@@ -608,9 +769,34 @@ main{max-width:640px;margin:0 auto;padding:6px 18px calc(40px + var(--safe-b))}
       <div><b id="resAvg">0.00</b><span>平均每格</span></div>
       <div><b id="resBest">--</b><span>历史最佳</span></div>
     </div>
+
+    <!-- 连训组统计，只在连训局数 > 1 时出现 -->
+    <div class="setline" id="setBlock" style="display:none">
+      <div class="t" id="setTitle">本组统计</div>
+      <div class="grid4">
+        <div><b id="setAvg">--</b><span>平均</span></div>
+        <div><b id="setMin">--</b><span>最好</span></div>
+        <div><b id="setMax">--</b><span>最差</span></div>
+        <div><b id="setSd">--</b><span>波动</span></div>
+      </div>
+      <div class="set-spark" id="setSpark"></div>
+    </div>
+
     <div class="btns">
       <button class="btn-primary" id="btnAgain">再来一次</button>
       <button class="btn-ghost" id="btnBack">返回设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 连训局间过渡 ==================== -->
+<div class="overlay" id="setOverlay">
+  <div class="panel" style="max-width:296px">
+    <div class="res-time" id="setRoundTime">0.00<small>s</small></div>
+    <p class="sub" id="setRoundSub" style="margin-bottom:0">第 1 局完成</p>
+    <div class="btns">
+      <button class="btn-primary" id="btnNextRound"><span id="setBtnLabel">下一局</span><span id="setCountdown"> 2.0s</span></button>
+      <button class="btn-ghost" id="btnEndSet">结束本组，看统计</button>
     </div>
   </div>
 </div>
@@ -629,10 +815,12 @@ const memoryFallback = {};
 
 const DEFAULT_DB = () => ({
   v: 1,
-  prefs: { size: 5, mode: "asc", fixation: true, hint: false, sound: true, vibrate: true },
-  recs: {},              // "size-mode" -> [{t:ms, e:errors, ts:timestamp}]
+  prefs: { size: 5, mode: "asc", fixation: true, hint: false, sound: true, vibrate: true,
+           dynamic: false, dynSpeed: 1, seq: "all", memory: false, memSec: 3, setRounds: 1,
+           shape: "square", hexRing: 2, rot: false, rotSpeed: 1, noDim: false },
+  recs: {},              // "棋盘id-模式[-附加][-数列]" -> [{t,e,n,ts}]
   totals: { sessions: 0, ms: 0 },
-  statsSel: { size: 5, mode: "asc" }
+  statsSel: { size: 5, mode: "asc", variant: 0, seq: "all", shape: "square", hexRing: 2 }
 });
 let DB = DEFAULT_DB();
 
@@ -651,6 +839,50 @@ function loadDB() {
       DB.statsSel = Object.assign(DEFAULT_DB().statsSel, p.statsSel || {});
     }
   } catch (e) { /* 数据损坏则使用默认值 */ }
+  sanitizeDB();
+}
+
+/* 旧版本存下来的设置里可能残留已废弃的取值，
+   直接拿去查 MODES / SEQS 会得到 undefined 并让结算页报错，这里统一兜底。 */
+function sanitizeDB() {
+  if ([3, 4, 5, 6, 7].indexOf(DB.prefs.size) < 0) DB.prefs.size = 5;
+  if ([3, 4, 5, 6, 7].indexOf(DB.statsSel.size) < 0) DB.statsSel.size = 5;
+  if (SHAPES.indexOf(DB.prefs.shape) < 0) DB.prefs.shape = "square";
+  if (SHAPES.indexOf(DB.statsSel.shape) < 0) DB.statsSel.shape = "square";
+  if ([1, 2, 3, 4].indexOf(DB.prefs.hexRing) < 0) DB.prefs.hexRing = 2;
+  if ([1, 2, 3, 4].indexOf(DB.statsSel.hexRing) < 0) DB.statsSel.hexRing = 2;
+  if (!ROT_SPEEDS[DB.prefs.rotSpeed]) DB.prefs.rotSpeed = 1;
+  // 用索引查表而不是 MODES[x] 的真值判断 —— 后者会让 "toString" 这类原型链上的名字混过去
+  if (MODE_KEYS.indexOf(DB.prefs.mode) < 0) DB.prefs.mode = "asc";
+  if (MODE_KEYS.indexOf(DB.statsSel.mode) < 0) DB.statsSel.mode = "asc";
+  if (!DYN_SPEEDS[DB.prefs.dynSpeed]) DB.prefs.dynSpeed = 1;
+  if (!SEQS.some((s) => s.key === DB.prefs.seq)) DB.prefs.seq = "all";
+  if (!SEQS.some((s) => s.key === DB.statsSel.seq)) DB.statsSel.seq = "all";
+  // 上限跟着 VARIANT_BITS 走，将来加第 5 个开关时不必回来改这里
+  const maxMask = (1 << VARIANT_BITS.length) - 1;
+  if (typeof DB.statsSel.variant !== "number" ||
+      !(DB.statsSel.variant >= 0 && DB.statsSel.variant <= maxMask)) DB.statsSel.variant = 0;
+  if ([2, 3, 5].indexOf(DB.prefs.memSec) < 0) DB.prefs.memSec = 3;
+  if ([1, 3, 5].indexOf(DB.prefs.setRounds) < 0) DB.prefs.setRounds = 1;
+  migrateRecKeys();
+}
+
+/* 旧版本的记录键用的是 -dyn / -mem / -dm 这种可读后缀，现在统一成位掩码。
+   不迁移的话，升级后从前的动态/记忆成绩会在统计页里凭空消失。 */
+function migrateRecKeys() {
+  const map = { dyn: 1, mem: 2, dm: 3 };
+  const keys = Object.keys(DB.recs);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    const m = /-(dyn|mem|dm)(?=-|$)/.exec(k);
+    if (!m) continue;
+    const nk = k.replace(m[0], "-v" + map[m[1]]);
+    if (nk === k) continue;
+    // 必须按时间重排：记录数组是「越靠后越新」的语义，
+    // 直接把旧记录追加到尾部会让「最近一次」「趋势末端」显示成从前的成绩。
+    DB.recs[nk] = (DB.recs[nk] || []).concat(DB.recs[k]).sort((a, b) => a.ts - b.ts);
+    delete DB.recs[k];
+  }
 }
 let saveTimer = null;
 function saveDB(now) {
@@ -726,6 +958,25 @@ function fmt(ms) {
   const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000;
   return m + ":" + (s < 10 ? "0" : "") + s.toFixed(2);
 }
+/* 带单位的成绩。注意 fmt() 在满 60 秒后会返回 "1:05.00" 这种 mm:ss，
+   此时再硬拼一个 "s" 就成了 "1:05.00s" —— 7×7 和记忆模式很容易超 60 秒，
+   所以凡是需要显示单位的地方都走这里。 */
+function fmtT(ms) {
+  if (ms === null || ms === undefined || isNaN(ms)) return "--";
+  return ms < 60000 ? (ms / 1000).toFixed(2) + "s" : fmt(ms);
+}
+/* 需要把单位用小字排版的场合（结算页大号数字、统计卡）。满 60 秒就不带单位了 */
+function fmtUnit(ms, tag) {
+  return ms < 60000 ? fmt(ms) + "<" + tag + ">s</" + tag + ">" : fmt(ms);
+}
+/* 累计训练时长，可能是几小时 */
+function fmtDuration(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + " 秒";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + " 分 " + (s % 60) + " 秒";
+  return Math.floor(m / 60) + " 小时 " + (m % 60) + " 分";
+}
 function fmtDate(ts) {
   const d = new Date(ts);
   const p = (n) => (n < 10 ? "0" : "") + n;
@@ -739,47 +990,233 @@ function bestOf(key) {
   return b;
 }
 
+/* 记录键：任何会改变难度的设置都必须进来，否则「历史最佳」会被简单题型刷掉。
+   组成 = 规格 - 模式 - [附加玩法] - [数列规则]。数列只对正序/倒序生效，其他模式恒为 all。 */
+function recKey(bid, mode, variant, seq) {
+  const s = (seq && seq !== "all" && seqApplies(mode)) ? "-" + seq : "";
+  return bid + "-" + mode + (variant || "") + s;
+}
+
 /* ---------------- 模式定义 ---------------- */
 const MODES = {
-  asc:   { name: "正序",     short: "1→N" },
-  desc:  { name: "倒序",     short: "N→1" },
-  alt:   { name: "橙蓝交替", short: "◐" },
-  mixed: { name: "字母数字", short: "1A" }
+  asc:    { name: "正序",     short: "1→N" },
+  desc:   { name: "倒序",     short: "N→1" },
+  alt:    { name: "橙蓝交替", short: "◐" },
+  stroop: { name: "颜色分组", short: "◑" },
+  mixed:  { name: "字母数字", short: "1A" }
 };
-const MODE_KEYS = ["asc", "desc", "alt", "mixed"];
+const MODE_KEYS = ["asc", "desc", "alt", "stroop", "mixed"];
+
+/* ---------------- 数列规则 ----------------
+   网格始终放满 1..N²，未入选的数字留在场上当干扰项 —— 这正是这类变体的训练点：
+   你必须一边按顺序找数，一边持续抑制那些数值相邻但不该点的格子。
+   只对正序 / 倒序生效，其他模式自带顺序规则。 */
+const SEQS = [
+  { key: "all",   name: "全部" },
+  { key: "odd",   name: "奇数" },
+  { key: "even",  name: "偶数" },
+  { key: "prime", name: "质数" },
+  { key: "mul3",  name: "3的倍数" }
+];
+function isPrime(x) {
+  if (x < 2) return false;
+  for (let d = 2; d * d <= x; d++) if (x % d === 0) return false;
+  return true;
+}
+function seqMatch(seq, v) {
+  if (seq === "odd")   return v % 2 === 1;
+  if (seq === "even")  return v % 2 === 0;
+  if (seq === "prime") return isPrime(v);
+  if (seq === "mul3")  return v % 3 === 0;
+  return true;
+}
+function seqApplies(mode) { return mode === "asc" || mode === "desc"; }
+function activeSeq() { return seqApplies(DB.prefs.mode) ? DB.prefs.seq : "all"; }
+function seqName(key) {
+  const s = SEQS.find((x) => x.key === key);
+  return s ? s.name : "全部";
+}
+
+/* ---------------- 附加玩法标记 ----------------
+   动态与记忆可叠加，四组合各自独立记录成绩。 */
+/* 动态 / 记忆 / 旋转 / 不变暗 四个开关可任意叠加，共 16 种组合。
+   用位掩码打包，掩码为 0 时键上不出现后缀 —— 这样 v1 时代存下来的纯数字键仍然读得到。
+   加新开关时只要在这里补一位，记录键、筛选、文案会一起跟上。 */
+const VARIANT_BITS = [
+  { bit: 1, name: "动态" },
+  { bit: 2, name: "记忆" },
+  { bit: 4, name: "旋转" },
+  { bit: 8, name: "不变暗" }
+];
+function variantMask(dyn, mem, rot, noDim) {
+  return (dyn ? 1 : 0) | (mem ? 2 : 0) | (rot ? 4 : 0) | (noDim ? 8 : 0);
+}
+function variantKey(mask) { return mask ? "-v" + mask : ""; }
+function variantLabel(mask) {
+  if (!mask) return "标准";
+  return VARIANT_BITS.filter((b) => mask & b.bit).map((b) => b.name).join("·");
+}
+function maskFromKey(bid, mode, key) {
+  const m = /^-v(\d+)/.exec(key.slice((bid + "-" + mode).length));
+  return m ? Number(m[1]) : 0;
+}
+/* 某个「棋盘 + 模式 + 数列」下真正有记录的附加组合，用于统计页只列出有数据的档位 */
+function variantsWithRecords(bid, mode, seq) {
+  const prefix = bid + "-" + mode;
+  const sfx = (seq && seq !== "all" && seqApplies(mode)) ? "-" + seq : "";
+  const found = [];
+  for (const k in DB.recs) {
+    if (!Object.prototype.hasOwnProperty.call(DB.recs, k)) continue;
+    if (k.indexOf(prefix) !== 0) continue;
+    if (!DB.recs[k] || !DB.recs[k].length) continue;
+    if (k.slice(prefix.length).replace(/^-v\d+/, "") !== sfx) continue;
+    const v = maskFromKey(bid, mode, k);
+    if (found.indexOf(v) < 0) found.push(v);
+  }
+  if (found.indexOf(0) < 0) found.push(0);
+  found.sort((a, b) => a - b);
+  return found;
+}
+
+/* ---------------- 棋盘形状 ----------------
+   方形：N×N（N = 3..7），共 N² 格
+   蜂窝：同心六边形，半径 R 圈（1..4），共 3R²+3R+1 格 = 7 / 19 / 37 / 61 */
+const SHAPES = ["square", "hex"];
+const HEX_HW = 2 / Math.sqrt(3);          // 尖顶六边形的 高/宽 = 2/√3 ≈ 1.1547
+
+function hexCount(R) { return 3 * R * R + 3 * R + 1; }
+
+/* 半径 R 的同心六边形里所有格子的轴坐标。
+   生成顺序固定（外层按 r、内层按 q），渲染和定位共用同一个数组，下标一一对应。 */
+function hexPositions(R) {
+  const out = [];
+  for (let r = -R; r <= R; r++) {
+    const qMin = Math.max(-R, -r - R);
+    const qMax = Math.min(R, -r + R);
+    for (let q = qMin; q <= qMax; q++) out.push({ q: q, r: r });
+  }
+  return out;
+}
+
+/* 把一个「棋盘选择」解析成渲染与统计需要的全部信息。
+   prefs 和 statsSel 都能往里传。 */
+function boardOf(p) {
+  if (p.shape === "hex") {
+    const R = Math.max(1, Math.min(4, p.hexRing || 2));
+    return { shape: "hex", ring: R, id: "h" + R, n: hexCount(R),
+             label: "蜂窝 " + R + " 圈", short: R + "圈" };
+  }
+  const N = p.size;
+  return { shape: "square", dim: N, id: String(N), n: N * N,
+           label: N + "×" + N, short: N + "×" + N };
+}
+
+/* 字母序号：1→A、26→Z、27→AA。
+   蜂窝 4 圈有 61 格，字母数字模式需要 30 个字母，超过 Z 之后必须还能往下排，
+   原来那句 fromCharCode(64 + i) 到 27 就会掉进 "[" 这类符号里。 */
+function letterAt(i) {
+  let s = "";
+  while (i > 0) {
+    const m = (i - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    i = Math.floor((i - 1) / 26);
+  }
+  return s;
+}
+
+/* 每次动态换位交换的对数：按格子总数给，保证不同规格下变化幅度体感接近 */
+function dynPairs(n) { return Math.max(1, Math.min(4, Math.round(n / 14))); }
+
+/* ---------------- 动态换位参数 ----------------
+   节奏决定「多久换一次」，每次交换的对数随格子数量走：
+   9 格只换 1 对，49 格换 3 对，保证不同规格下的变化幅度体感接近。 */
+const DYN_SPEEDS = [
+  { name: "慢", ms: 2500 },
+  { name: "中", ms: 1500 },
+  { name: "快", ms: 900 }
+];
+const ROT_SPEEDS = [
+  { name: "慢", ms: 90000 },   // 转一圈所需的毫秒数
+  { name: "中", ms: 60000 },
+  { name: "快", ms: 30000 }
+];
+
+function dynSpeed() {
+  return DYN_SPEEDS[DB.prefs.dynSpeed] || DYN_SPEEDS[1];
+}
+function rotSpeed() {
+  return ROT_SPEEDS[DB.prefs.rotSpeed] || ROT_SPEEDS[1];
+}
 
 /* ---------------- 出题 ---------------- */
-function buildRound(size, mode) {
-  const n = size * size;
-  let order = [];        // 点击顺序 [{label,color}]
+/* 把 1..n 随机均分成两组（总数为奇数时 A 组多一个） */
+function splitTwoGroups(n) {
+  const idx = shuffle([...Array(n).keys()]);
+  const aCount = Math.ceil(n / 2);
+  const isA = new Set(idx.slice(0, aCount).map((i) => i + 1));
+  const aNums = [], bNums = [];
+  for (let i = 1; i <= n; i++) (isA.has(i) ? aNums : bNums).push(i);
+  aNums.sort((a, b) => a - b);
+  bNums.sort((a, b) => a - b);
+  return { aNums: aNums, bNums: bNums };
+}
+
+function buildRound(n, mode, seq) {
+  let order = [];      // 点击顺序 [{label,color}]
+  let labels = [];     // 网格上实际出现的全部格子（可能多于 order，多出来的是干扰项）
+
   if (mode === "asc" || mode === "desc") {
-    for (let i = 1; i <= n; i++) order.push({ label: String(i), color: "num" });
+    // 网格放满全部数字；只有符合数列规则的才进入点击序列
+    for (let i = 1; i <= n; i++) labels.push({ label: String(i), color: "num" });
+    for (let i = 1; i <= n; i++) {
+      if (seqMatch(seq, i)) order.push({ label: String(i), color: "num" });
+    }
+    // 极端配置下（小棋盘 + 稀疏规则）可能一个目标都筛不出来。
+    // 不兜底的话 order 为空会让这一局永远点不完，进度条还会显示 NaN%。
+    if (!order.length) {
+      for (let i = 1; i <= n; i++) order.push({ label: String(i), color: "num" });
+    }
     if (mode === "desc") order.reverse();
+
   } else if (mode === "mixed") {
     const numCount = Math.ceil(n / 2);
     for (let i = 1; i <= numCount; i++) {
       order.push({ label: String(i), color: "num" });
-      if (order.length < n) order.push({ label: String.fromCharCode(64 + i), color: "alpha" });
+      if (order.length < n) order.push({ label: letterAt(i), color: "alpha" });
     }
-  } else { // alt：橙蓝两组，交替取各组最小
-    const idx = shuffle([...Array(n).keys()]);
-    const orangeCount = Math.ceil(n / 2);
-    const isOrange = new Set(idx.slice(0, orangeCount).map((i) => i + 1));
-    const oNums = [], bNums = [];
-    for (let i = 1; i <= n; i++) (isOrange.has(i) ? oNums : bNums).push(i);
-    oNums.sort((a, b) => a - b);
-    bNums.sort((a, b) => a - b);
-    for (let i = 0; i < oNums.length; i++) {
-      order.push({ label: String(oNums[i]), color: "alt1" });
-      if (bNums[i] !== undefined) order.push({ label: String(bNums[i]), color: "alt2" });
+    labels = order.map((it) => ({ label: it.label, color: it.color }));
+
+  } else if (mode === "alt") {
+    // 橙蓝交替：两组数字，轮流取各组最小的那个
+    const g = splitTwoGroups(n);
+    for (let i = 0; i < g.aNums.length; i++) {
+      order.push({ label: String(g.aNums[i]), color: "alt1" });
+      if (g.bNums[i] !== undefined) order.push({ label: String(g.bNums[i]), color: "alt2" });
     }
+    labels = order.map((it) => ({ label: it.label, color: it.color }));
+
+  } else {
+    // 颜色分组：先点完一组升序，再点另一组升序。
+    // 先点哪一组开局随机决定，靠顶部色标提示 —— 持续抑制另一组才是这个玩法的训练点。
+    const g = splitTwoGroups(n);
+    const aFirst = Math.random() < 0.5;
+    const first = aFirst ? g.aNums : g.bNums;
+    const second = aFirst ? g.bNums : g.aNums;
+    const cFirst = aFirst ? "alt1" : "alt2";
+    const cSecond = aFirst ? "alt2" : "alt1";
+    for (const v of first) order.push({ label: String(v), color: cFirst });
+    for (const v of second) order.push({ label: String(v), color: cSecond });
+    for (const v of g.aNums) labels.push({ label: String(v), color: "alt1" });
+    for (const v of g.bNums) labels.push({ label: String(v), color: "alt2" });
   }
+
   // 最长标签位数（决定字号上限：1 位数可以放得更大）
   let maxLen = 1;
-  for (const it of order) if (it.label.length > maxLen) maxLen = it.label.length;
-  // 打乱摆放位置（顺序仍为 order）
-  const board = shuffle(order.map((it) => ({ label: it.label, color: it.color })));
-  return { size, mode, n, order, board, maxLen };
+  for (const it of labels) if (it.label.length > maxLen) maxLen = it.label.length;
+
+  // 打乱摆放位置（点击顺序仍是 order）
+  const board = shuffle(labels);
+  return { mode, n, order, board, maxLen };
 }
 
 /* ---------------- 运行时状态 ---------------- */
@@ -792,32 +1229,88 @@ const timerEl = $("#timerEl");
 const progressFill = $("#progressFill");
 const colorChip = $("#colorChip");
 const colorChipTx = $("#colorChipTx");
+const memChip = $("#memChip");
 const trainScreen = $("#trainScreen");
+const setOverlay = $("#setOverlay");
+const setRoundTime = $("#setRoundTime");
+const setRoundSub = $("#setRoundSub");
+const setCountdown = $("#setCountdown");
+const setBtnLabel = $("#setBtnLabel");
 
 function layoutBoard() {
   if (!G) return;
-  const w = boardWrap.clientWidth, h = boardWrap.clientHeight;
-  const s = Math.max(120, Math.min(w, h));
-  boardEl.style.width = s + "px";
-  boardEl.style.height = s + "px";
-  const gap = Math.max(3, Math.min(11, s * 0.013));
-  const radius = Math.max(7, Math.min(16, (s / G.size) * 0.19));
-  // 字号按「实际格子宽度」计算；再用最长标签的占宽做一次安全收敛，避免两位数顶到格边
-  const cellW = (s - gap * (G.size - 1)) / G.size;
-  const maxLen = G.maxLen || String(G.size * G.size).length;
-  let fs = cellW * (maxLen <= 1 ? 0.56 : G.size >= 7 ? 0.52 : 0.54);
-  if (maxLen > 1) fs = Math.min(fs, (cellW * 0.86) / (maxLen * 0.62));
-  fs = Math.min(fs, 160);   // 超高分辨率屏幕的兜底上限（正常情况下不会触发）
-  boardEl.style.gridTemplateColumns = "repeat(" + G.size + ",1fr)";
-  boardEl.style.gridTemplateRows = "repeat(" + G.size + ",1fr)";
-  boardEl.style.gap = gap + "px";
-  boardEl.style.fontSize = fs.toFixed(2) + "px";
-  boardEl.style.setProperty("--cellr", radius + "px");
-  for (const c of boardEl.children) c.style.borderRadius = radius + "px";
-  const pillFs = Math.max(13, Math.min(19, s * 0.036));
-  hintPill.style.fontSize = pillFs.toFixed(1) + "px";
-  hintPill.style.marginTop = (s * 0.085) + "px";
-  const dot = Math.max(7, Math.min(12, s * 0.02));
+  // 注意 max 要放在最后：容器在隐藏状态下 clientHeight 为 0，
+  // 若先抬到 140 再算，棋盘会算出比容器还大的尺寸并压到进度条上。
+  const avail = Math.max(60, Math.min(boardWrap.clientWidth, boardWrap.clientHeight) * 0.97);
+
+  // 棋盘的自然尺寸（相对单位）
+  let natW = 1, natH = 1;
+  if (G.shape === "hex") {
+    natW = 2 * G.ring + 1;
+    natH = HEX_HW * (1.5 * G.ring + 1);
+  }
+  // 旋转时棋盘会扫出一个直径等于对角线的圆，必须按对角线卡进可用空间，否则边角会被切掉。
+  // 代价是棋盘整体缩到约 70%，这是旋转的固有开销。
+  const k = G.rot
+    ? avail / Math.sqrt(natW * natW + natH * natH)
+    : avail / Math.max(natW, natH);
+  const bw = natW * k, bh = natH * k;
+  boardEl.style.width = bw.toFixed(1) + "px";
+  boardEl.style.height = bh.toFixed(1) + "px";
+
+  const maxLen = G.maxLen || String(G.n).length;
+  const cells = boardEl.children;
+
+  if (G.shape === "hex") {
+    boardEl.style.gridTemplateColumns = "";
+    boardEl.style.gridTemplateRows = "";
+    boardEl.style.gap = "";
+    boardEl.style.fontSize = "";
+    const wp = bw / (2 * G.ring + 1);       // 相邻两列的水平间距
+    const hp = wp * HEX_HW;                 // 相邻两行的垂直间距
+    const cw = wp * 0.93, ch = hp * 0.93;   // 收一点，格与格之间留缝
+    let fs = cw * (maxLen <= 1 ? 0.48 : 0.40);
+    if (maxLen > 1) fs = Math.min(fs, (cw * 0.84) / (maxLen * 0.62));
+    fs = Math.min(fs, 160);
+    for (let i = 0; i < cells.length; i++) {
+      const p = G.hexPos[i] || { q: 0, r: 0 };
+      const cx = (G.ring + p.q + p.r / 2 + 0.5) * wp;
+      const cy = (0.75 * (G.ring + p.r) + 0.5) * hp;
+      const c = cells[i];
+      c.style.width = cw.toFixed(1) + "px";
+      c.style.height = ch.toFixed(1) + "px";
+      c.style.left = (cx - cw / 2).toFixed(1) + "px";
+      c.style.top = (cy - ch / 2).toFixed(1) + "px";
+      c.style.fontSize = fs.toFixed(2) + "px";
+      c.style.borderRadius = "";
+    }
+    hintPill.style.marginTop = Math.max(30, bh * 0.17).toFixed(0) + "px";
+    hintPill.style.fontSize = Math.max(12, Math.min(18, cw * 0.5)).toFixed(1) + "px";
+
+  } else {
+    const N = G.dim;
+    const gap = Math.max(3, Math.min(11, bw * 0.013));
+    const radius = Math.max(7, Math.min(16, (bw / N) * 0.19));
+    // 字号按「实际格子宽度」算；再用最长标签的占宽做一次安全收敛，避免两位数顶到格边
+    const cellW = (bw - gap * (N - 1)) / N;
+    let fs = cellW * (maxLen <= 1 ? 0.56 : N >= 7 ? 0.52 : 0.54);
+    if (maxLen > 1) fs = Math.min(fs, (cellW * 0.86) / (maxLen * 0.62));
+    fs = Math.min(fs, 160);
+    boardEl.style.gridTemplateColumns = "repeat(" + N + ",1fr)";
+    boardEl.style.gridTemplateRows = "repeat(" + N + ",1fr)";
+    boardEl.style.gap = gap + "px";
+    boardEl.style.fontSize = fs.toFixed(2) + "px";
+    for (const c of cells) {
+      c.style.borderRadius = radius + "px";
+      // 清掉可能从蜂窝模式带过来的行内定位，否则切回方形时格子会全部叠在一起
+      c.style.width = ""; c.style.height = "";
+      c.style.left = ""; c.style.top = ""; c.style.fontSize = "";
+    }
+    hintPill.style.marginTop = (bw * 0.085).toFixed(0) + "px";
+    hintPill.style.fontSize = Math.max(13, Math.min(19, bw * 0.036)).toFixed(1) + "px";
+  }
+
+  const dot = Math.max(7, Math.min(12, Math.min(bw, bh) * 0.02));
   fixDot.style.width = dot + "px";
   fixDot.style.height = dot + "px";
   fixDot.style.margin = (-dot / 2) + "px 0 0 " + (-dot / 2) + "px";
@@ -825,6 +1318,8 @@ function layoutBoard() {
 
 function renderBoard() {
   boardEl.innerHTML = "";
+  boardEl.classList.toggle("hexgrid", G.shape === "hex");
+  boardEl.classList.toggle("rot", !!G.rot);
   const frag = document.createDocumentFragment();
   for (const item of G.board) {
     const b = document.createElement("button");
@@ -844,8 +1339,8 @@ function updateHint() {
   const cur = G.order[Math.min(G.idx, G.order.length - 1)];
   const total = G.order.length;
   const remaining = total - G.idx;
-  // 顶部颜色提示（仅交替模式需要）
-  if (G.mode === "alt" && G.running) {
+  // 顶部色标：橙蓝交替与颜色分组都需要知道「当前该点哪一组」
+  if ((G.mode === "alt" || G.mode === "stroop") && G.running) {
     colorChip.classList.add("on");
     colorChip.classList.toggle("blue", cur.color === "alt2");
     colorChipTx.textContent = cur.color === "alt1" ? "橙组" : "蓝组";
@@ -865,17 +1360,109 @@ function updateHint() {
 }
 
 const timerNum = $("#timerNum");
+const timerUnit = $("#timerUnit");
+let timerLong = false;
 function updateTimer() {
   if (!G) return;
   const t = G.running ? performance.now() - G.startTs - G.pausedTotal : G.elapsed;
   timerNum.textContent = fmt(t);   // 独立文本节点，避免每帧重建 DOM
+  // 满 60 秒后 fmt 返回的是 mm:ss，那个常驻的 "s" 必须收起来，否则显示成 "1:05.00s"
+  const long = t >= 60000;
+  if (long !== timerLong) {
+    timerLong = long;
+    timerUnit.style.display = long ? "none" : "";
+  }
 }
 
-/* ---------------- 计时 ---------------- */
+/* ---------------- 计时 + 动态换位调度 ----------------
+   换位挂在同一个 rAF 循环上：暂停时 tickLoop 不再运行，
+   换位自然跟着停下，不需要额外的定时器去同步。 */
 function tickLoop() {
   if (!G || !G.running) return;
+  const now = performance.now();
+  const elapsed = now - G.startTs - G.pausedTotal;   // 只累计真正在跑的时间
   updateTimer();
+
+  // 记忆模式：先读秒，到点把数字藏起来
+  if (G.memMs && !G.blind) {
+    const left = Math.max(0, (G.memMs - elapsed) / 1000);
+    const shown = left.toFixed(1);
+    if (shown !== G.memShown) {
+      G.memShown = shown;
+      memChip.textContent = "记忆 " + shown;
+      memChip.classList.toggle("warn", left <= 1);
+    }
+    if (left <= 0) {
+      G.blind = true;
+      boardEl.classList.add("blind");
+      memChip.classList.remove("on", "warn");
+    }
+  }
+
+  if (G.dynNextAt && now >= G.dynNextAt) {
+    doDynamicSwap();
+    G.dynNextAt = now + G.dynInterval;   // 以当前时刻为基准，掉帧也不会连着补触发
+  }
+
+  // 整盘旋转：角度由「真实运行时长」反推，不累加。
+  // 好处是暂停/掉帧都不会让角度跳变，恢复后接着原来的进度转。
+  if (G.rot) {
+    boardEl.style.transform = "rotate(" + ((elapsed / G.rotMs) * 360).toFixed(2) + "deg)";
+  }
+
   G.raf = requestAnimationFrame(tickLoop);
+}
+
+/* 已点过的数字（标签在一局内唯一，用标签判断即可） */
+function consumedLabels() {
+  const s = new Set();
+  for (let i = 0; i < G.idx; i++) s.add(G.order[i].label);
+  return s;
+}
+
+/* 随机交换若干对「尚未点过」的格子。
+   已点过的格子不参与交换，否则会把灰掉的格子重新搅活，看着像出错。 */
+function doDynamicSwap() {
+  const used = consumedLabels();
+  const free = [];
+  for (let i = 0; i < G.board.length; i++) {
+    if (!used.has(G.board[i].label)) free.push(i);
+  }
+  if (free.length < 2) return;                       // 只剩 0~1 格，没什么可换的
+
+  const pairs = Math.min(dynPairs(G.n), Math.floor(free.length / 2));
+  const pool = shuffle(free.slice());
+  const touched = [];
+  for (let k = 0; k < pairs; k++) {
+    const a = pool.pop(), b = pool.pop();
+    if (a === undefined || b === undefined) break;
+    const tmp = G.board[a];
+    G.board[a] = G.board[b];
+    G.board[b] = tmp;
+    touched.push(a, b);
+  }
+  applyMoved(touched);
+}
+
+/* 把 G.board 的新排列反映到 DOM 上，并给动过的格子一道轻微脉冲 */
+function applyMoved(touched) {
+  const cells = boardEl.children;
+  for (let k = 0; k < touched.length; k++) {
+    const i = touched[k];
+    const cell = cells[i];
+    if (!cell) continue;
+    const item = G.board[i];
+    cell.textContent = item.label;
+    cell.dataset.label = item.label;
+    cell.setAttribute("aria-label", item.label);
+    // 用增量方式改类名，不要整体赋值 —— 整体赋值会顺带抹掉 .done / .wrong 等状态
+    cell.classList.remove("c-alt1", "c-alt2", "c-alpha");
+    if (item.color !== "num") cell.classList.add("c-" + item.color);
+    cell.classList.add("moved");
+    (function (el) {
+      setTimeout(function () { el.classList.remove("moved"); }, 470);
+    })(cell);
+  }
 }
 
 /* ---------------- 开始一局 ---------------- */
@@ -885,63 +1472,34 @@ function clearCountdown() {
   countdownTimers = [];
 }
 
-function startRound() {
-  const size = DB.prefs.size, mode = DB.prefs.mode;
-  const round = buildRound(size, mode);
-  G = {
-    size, mode, n: round.n,
-    maxLen: round.maxLen,
-    order: round.order,
-    board: round.board,
-    idx: 0,
-    errors: 0,
-    startTs: 0,
-    pausedTotal: 0,
-    elapsed: 0,
-    running: false,
-    paused: false,
-    raf: 0
-  };
-
-  renderBoard();
-
-  // 复位界面
-  timerNum.textContent = "0.00";
-  timerEl.classList.remove("rec");
-  progressFill.style.width = "0%";
-  progressFill.style.opacity = "0";
-  colorChip.classList.remove("on");
-  hintPill.className = "hintpill";
-  boardEl.classList.remove("blur");
-  closeOverlay("pauseOverlay");
-  closeOverlay("resultOverlay");
-  trainScreen.classList.add("on");
-  document.body.classList.add("locked");
-  layoutBoard();
-  // 释放按钮焦点，避免空格/回车键误触发「开始训练」
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-
-  // 倒计时
+/* 倒数 3-2-1。抽成独立函数，是因为倒计时途中按暂停后，
+   恢复时应该重新完整地数一遍，而不是从半截接着数。 */
+function runCountdown() {
   const cd = $("#countdown");
   const cdNum = $("#cdNum");
+  clearCountdown();
+  G.counting = true;
   cd.classList.add("on");
   boardEl.classList.add("blur");
   let step = 0;
-  const seq = ["3", "2", "1", "开始"];
+  const cdSeq = ["3", "2", "1", "开始"];
   const run = () => {
-    if (step >= seq.length) {
+    if (step >= cdSeq.length) {
+      G.counting = false;
       cd.classList.remove("on");
       boardEl.classList.remove("blur");
       G.startTs = performance.now();
       G.pausedTotal = 0;
       G.running = true;
+      G.dynNextAt = G.dyn ? G.startTs + G.dynInterval : 0;
+      if (G.mem) memChip.classList.add("on");
       updateHint();
       updateTimer();
       SFX.go();
       G.raf = requestAnimationFrame(tickLoop);
       return;
     }
-    cdNum.textContent = seq[step];
+    cdNum.textContent = cdSeq[step];
     cdNum.classList.toggle("cd-go", step === 3);
     // 重启动画
     cdNum.style.animation = "none";
@@ -952,6 +1510,82 @@ function startRound() {
     countdownTimers.push(setTimeout(run, 640));
   };
   run();
+}
+
+/* 连训组状态：total 局、当前第 index 局、已完成的成绩 */
+let SET = { total: 1, index: 0, times: [] };
+
+/* 从设置页开一组的唯一入口 */
+function beginSet() {
+  SET = { total: Math.max(1, DB.prefs.setRounds || 1), index: 0, times: [] };
+  startRound();
+}
+
+function startRound() {
+  SET.index++;
+  const mode = DB.prefs.mode, sq = activeSeq();
+  const bd = boardOf(DB.prefs);
+  const vmask = variantMask(DB.prefs.dynamic, DB.prefs.memory, DB.prefs.rot, DB.prefs.noDim);
+  const round = buildRound(bd.n, mode, sq);
+  G = {
+    shape: bd.shape, ring: bd.ring, dim: bd.dim,
+    bid: bd.id, boardLabel: bd.label, n: bd.n,
+    mode, seq: sq,
+    maxLen: round.maxLen,
+    order: round.order,
+    board: round.board,
+    hexPos: bd.shape === "hex" ? hexPositions(bd.ring) : null,
+    rot: !!DB.prefs.rot,
+    rotMs: rotSpeed().ms,
+    noDim: !!DB.prefs.noDim,
+    vmask: vmask,
+    vkey: variantKey(vmask),
+    dyn: !!DB.prefs.dynamic,
+    dynInterval: dynSpeed().ms,
+    dynNextAt: 0,
+    mem: !!DB.prefs.memory,
+    memMs: DB.prefs.memory ? DB.prefs.memSec * 1000 : 0,
+    memShown: "",
+    blind: false,
+    setIndex: SET.index,
+    setTotal: SET.total,
+    idx: 0,
+    errors: 0,
+    startTs: 0,
+    pausedTotal: 0,
+    elapsed: 0,
+    counting: false,     // 正在倒数 3-2-1
+    running: false,
+    paused: false,
+    raf: 0
+  };
+
+  renderBoard();
+
+  // 复位界面
+  timerNum.textContent = "0.00";
+  timerLong = false;
+  timerUnit.style.display = "";
+  timerEl.classList.remove("rec");
+  progressFill.style.width = "0%";
+  progressFill.style.opacity = "0";
+  colorChip.classList.remove("on");
+  memChip.classList.remove("on", "warn");
+  memChip.textContent = "记忆 " + (G.memMs / 1000).toFixed(1);
+  hintPill.className = "hintpill";
+  fixDot.classList.toggle("on", !!DB.prefs.fixation);   // 注视点开关此前一直没接到界面上
+  boardEl.style.transform = "";                          // 上一局的旋转角不复用
+  boardEl.classList.remove("blur", "blind");
+  closeOverlay("pauseOverlay");
+  closeOverlay("resultOverlay");
+  closeOverlay("setOverlay");
+  trainScreen.classList.add("on");
+  document.body.classList.add("locked");
+  layoutBoard();
+  // 释放按钮焦点，避免空格/回车键误触发「开始训练」
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+
+  runCountdown();
 }
 
 function closeOverlay(id) { document.getElementById(id).classList.remove("on"); }
@@ -971,7 +1605,10 @@ function tapCell(cell) {
   if (!target) return;
 
   if (label === target.label) {
-    cell.classList.add("done", "pop");
+    // 「点击不变暗」模式下不加 .done：格子外观与未点完全一致，也保持可点。
+    // 重复点已经点过的格子时，它的数字不等于当前目标，会自然落进下面的错误分支。
+    if (G.noDim) cell.classList.add("pop");
+    else cell.classList.add("done", "pop");
     setTimeout(() => cell.classList.remove("pop"), 230);
     G.idx++;
     SFX.ok();
@@ -991,7 +1628,22 @@ function tapCell(cell) {
 
 /* ---------------- 暂停 / 退出 ---------------- */
 function pauseRound() {
-  if (!G || !G.running || G.paused) return;
+  if (!G || G.paused) return;
+
+  // 倒计时途中按暂停：停掉读数，恢复时从头再数一遍
+  if (G.counting) {
+    clearCountdown();
+    closeOverlay("countdown");   // 不摘掉的话，那个大号数字会静止留在暂停面板后面
+    G.counting = false;
+    G.paused = true;
+    G.pauseStart = performance.now();
+    boardEl.classList.add("blur");
+    $("#pauseOverlay").classList.add("on");
+    progressFill.style.opacity = "0";
+    return;
+  }
+
+  if (!G.running) return;
   G.running = false;
   G.paused = true;
   cancelAnimationFrame(G.raf);
@@ -1003,37 +1655,105 @@ function pauseRound() {
   colorChip.classList.remove("on");
 }
 function resumeRound() {
-  if (!G || !G.paused) return;
-  G.pausedTotal += performance.now() - G.pauseStart;
-  G.running = true;
-  G.paused = false;
+  // 训练层不在了就绝不恢复 —— 否则退出后按空格会在设置页上重新跑起一局隐形训练
+  if (!G || !G.paused || !trainScreen.classList.contains("on")) return;
+  const away = performance.now() - G.pauseStart;
   closeOverlay("pauseOverlay");
   boardEl.classList.remove("blur");
+
+  // startTs 还是 0 说明连倒计时都没走完，重新数一遍再开始
+  if (!G.running && !G.startTs) {
+    G.paused = false;
+    G.pausedTotal = 0;
+    runCountdown();
+    return;
+  }
+
+  G.pausedTotal += away;
+  if (G.dynNextAt) G.dynNextAt += away;   // 暂停期间不该发生换位，把时刻整体顺延
+  G.running = true;
+  G.paused = false;
   updateHint();
   G.raf = requestAnimationFrame(tickLoop);
 }
 function quitRound() {
-  if (G) { G.running = false; cancelAnimationFrame(G.raf); }
+  if (G) { G.running = false; G.counting = false; cancelAnimationFrame(G.raf); }
+  G = null;                    // 彻底作废这一局，防止残留的 paused 状态被别的入口唤醒
   clearCountdown();
+  clearSetTimer();
+  if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
+  boardEl.style.transform = "";
+  SET = { total: 1, index: 0, times: [] };
   closeOverlay("pauseOverlay");
   closeOverlay("resultOverlay");
+  closeOverlay("setOverlay");
   closeOverlay("countdown");
   trainScreen.classList.remove("on");
   document.body.classList.remove("locked");
   colorChip.classList.remove("on");
+  memChip.classList.remove("on", "warn");
+  boardEl.classList.remove("blind");
+  fixDot.classList.remove("on");
   renderHome();
 }
 
+/* ---------------- 连训：局间过渡 ---------------- */
+let setTick = null, setLeft = 0, setShowTimer = null;
+function clearSetTimer() {
+  if (setTick) { clearInterval(setTick); setTick = null; }
+  if (setShowTimer) { clearTimeout(setShowTimer); setShowTimer = null; }
+}
+
+function showSetInterstitial(rec) {
+  trainScreen.classList.remove("on");
+  document.body.classList.remove("locked");
+  setRoundTime.innerHTML = fmtUnit(rec.t, "small");
+  setRoundSub.textContent = "第 " + SET.index + " 局完成 · 共 " + SET.total + " 局";
+  setLeft = 2.0;
+  setBtnLabel.textContent = "下一局";
+  setCountdown.textContent = " " + setLeft.toFixed(1) + "s";
+  setOverlay.classList.add("on");
+  if (setTick) clearInterval(setTick);
+  setTick = setInterval(() => {
+    setLeft = Math.max(0, setLeft - 0.1);
+    setCountdown.textContent = " " + setLeft.toFixed(1) + "s";
+    if (setLeft <= 0) advanceSet();
+  }, 100);
+}
+
+/* 进入下一局。自动读秒到点和手动点按钮都走这里，
+   用一个「过渡页还在不在」的判断挡住重复触发。 */
+function advanceSet() {
+  if (!setOverlay.classList.contains("on")) return;
+  clearSetTimer();
+  closeOverlay("setOverlay");
+  startRound();
+}
+
+/* 提前收工：跳过本组剩余局数，直接看已经跑完这部分的统计 */
+function endSetEarly() {
+  if (!setOverlay.classList.contains("on")) return;   // 过渡页已经收了就别再插手
+  clearSetTimer();
+  closeOverlay("setOverlay");
+  showResultPanel();
+}
+
 /* ---------------- 结算 ---------------- */
+let pendingRec = null, pendingPrevBest = null, resultTimer = null;
+
 function finishRound() {
   G.running = false;
   cancelAnimationFrame(G.raf);
   const t = Math.max(1, Math.round(performance.now() - G.startTs - G.pausedTotal));
   G.elapsed = t;
+  G.blind = false;
+  boardEl.classList.remove("blind");
+  memChip.classList.remove("on", "warn");
 
-  const key = G.size + "-" + G.mode;
-  const prevBest = bestOf(key);
-  const rec = { t, e: G.errors, ts: Date.now() };
+  const key = recKey(G.bid, G.mode, G.vkey, G.seq);
+  pendingPrevBest = bestOf(key);           // 必须在写入本局之前取，否则会拿自己跟历史比
+  const rec = { t, e: G.errors, n: G.order.length, ts: Date.now() };
+  pendingRec = rec;
 
   if (!DB.recs[key]) DB.recs[key] = [];
   DB.recs[key].push(rec);
@@ -1042,10 +1762,31 @@ function finishRound() {
   DB.totals.ms += t;
   saveDB(true);
 
+  SET.times.push(rec);
+
+  // 连训还没跑完，先走局间过渡页
+  if (SET.index < SET.total) {
+    SFX.finish();
+    vibrate([20, 45, 20]);
+    setShowTimer = setTimeout(() => {
+      setShowTimer = null;
+      if (SET.index < SET.total) showSetInterstitial(rec);
+    }, 240);
+    return;
+  }
+
+  showResultPanel();
+}
+
+function showResultPanel() {
+  const rec = pendingRec;
+  if (!rec) return;
+  const t = rec.t;
+  const prevBest = pendingPrevBest;
   const isRec = prevBest === null || t < prevBest;
   const newBest = isRec ? t : prevBest;
 
-  // 结算面板
+  // 徽章
   const badge = $("#recBadge");
   badge.style.cssText = "";
   if (isRec) {
@@ -1056,21 +1797,35 @@ function finishRound() {
     badge.className = "badge";
     badge.style.background = diff > 0 ? "#f2f3f7" : "var(--ok-soft)";
     badge.style.color = diff > 0 ? "#6b7280" : "#0e9f60";
-    badge.textContent = diff === 0 ? "追平最佳成绩" : "比最佳慢 " + fmt(diff) + "s";
+    badge.textContent = diff === 0 ? "追平最佳成绩" : "比最佳慢 " + fmtT(diff);
   } else { badge.className = ""; badge.innerHTML = ""; }
 
   const rt = $("#resTime");
   rt.className = "res-time" + (isRec ? " isrec" : "");
-  rt.innerHTML = fmt(t) + "<small>s</small>";
-  $("#resSub").textContent = G.size + "×" + G.size + " · " + MODES[G.mode].name + " · 共 " + G.order.length + " 格";
+  rt.innerHTML = fmtUnit(t, "small");
+
+  // 副标题：把这一局用到的全部规则都写出来
+  const parts = [G.boardLabel, MODES[G.mode].name];
+  if (seqApplies(G.mode) && G.seq !== "all") parts.push(seqName(G.seq));
+  // 直接复用 variantLabel，保证结算页、统计页档位名、历史记录的写法完全一致
+  if (G.vmask) parts.push(variantLabel(G.vmask));
+  parts.push("共 " + G.order.length + " 个目标");
+  $("#resSub").textContent = parts.join(" · ");
+
   $("#resErr").textContent = G.errors;
   $("#resAvg").textContent = (t / G.order.length / 1000).toFixed(2);
-  $("#resBest").textContent = fmt(newBest);
+  $("#resBest").textContent = fmtT(newBest);
+
+  renderSetStats();
 
   SFX.finish();
   vibrate([26, 55, 26, 55, 90]);
 
-  setTimeout(() => {
+  // 存句柄是为了能取消：这 260ms 内用户按了退出或安卓返回键的话，
+  // 定时器再触发就会把上一局的结算面板盖到设置页上。
+  resultTimer = setTimeout(() => {
+    resultTimer = null;
+    if (!G) return;
     $("#resultOverlay").classList.add("on");
     trainScreen.classList.remove("on");
     document.body.classList.remove("locked");
@@ -1078,17 +1833,67 @@ function finishRound() {
   }, 260);
 }
 
+/* 连训组统计：平均、最好、最差、波动，外加一排迷你柱状图。
+   柱子越高 = 用时越长，和趋势图「线越低越快」保持一致。 */
+function renderSetStats() {
+  const block = $("#setBlock");
+  const times = SET.times.map((r) => r.t);
+  if (times.length < 2) { block.style.display = "none"; return; }
+  block.style.display = "";
+
+  const sum = times.reduce((a, b) => a + b, 0);
+  const avg = sum / times.length;
+  const min = Math.min(...times), max = Math.max(...times);
+  const variance = times.reduce((a, b) => a + (b - avg) * (b - avg), 0) / times.length;
+  const sd = Math.sqrt(variance);
+
+  $("#setTitle").textContent = "本组 " + times.length + " 局";
+  $("#setAvg").textContent = fmt(avg);
+  $("#setMin").textContent = fmt(min);
+  $("#setMax").textContent = fmt(max);
+  $("#setSd").textContent = "±" + (sd / 1000).toFixed(2) + "s";
+
+  const spark = $("#setSpark");
+  spark.innerHTML = "";
+  for (let i = 0; i < times.length; i++) {
+    const bar = document.createElement("i");
+    bar.style.height = max > min
+      ? (8 + 26 * (times[i] - min) / (max - min)).toFixed(0) + "px"
+      : "20px";
+    if (times[i] === min) bar.classList.add("best");
+    if (i === times.length - 1) bar.classList.add("last");
+    spark.appendChild(bar);
+  }
+}
+
 /* ---------------- 记录 / 统计 ---------------- */
 function renderStatSegs() {
-  const sz = $("#statSize"), md = $("#statMode");
-  sz.innerHTML = "";
-  for (let i = 3; i <= 7; i++) {
+  // 形状
+  const sh = $("#statShape");
+  sh.innerHTML = "";
+  [["方形", "square"], ["蜂窝", "hex"]].forEach((pair) => {
     const b = document.createElement("button");
-    b.textContent = i + "×" + i;
-    b.dataset.size = i;
-    b.className = DB.statsSel.size === i ? "on" : "";
+    b.textContent = pair[0];
+    b.dataset.shape = pair[1];
+    b.className = DB.statsSel.shape === pair[1] ? "on" : "";
+    sh.appendChild(b);
+  });
+
+  // 规格：跟着形状走
+  const sz = $("#statSize"), md = $("#statMode");
+  const isHex = DB.statsSel.shape === "hex";
+  const curSize = isHex ? DB.statsSel.hexRing : DB.statsSel.size;
+  const sizeOpts = isHex
+    ? [1, 2, 3, 4].map((R) => ({ v: R, t: R + "圈" }))
+    : [3, 4, 5, 6, 7].map((N) => ({ v: N, t: N + "×" + N }));
+  sz.innerHTML = "";
+  sizeOpts.forEach((o) => {
+    const b = document.createElement("button");
+    b.textContent = o.t;
+    b.dataset.size = o.v;
+    b.className = o.v === curSize ? "on" : "";
     sz.appendChild(b);
-  }
+  });
   md.innerHTML = "";
   for (const k of MODE_KEYS) {
     const b = document.createElement("button");
@@ -1097,19 +1902,62 @@ function renderStatSegs() {
     b.className = DB.statsSel.mode === k ? "on" : "";
     md.appendChild(b);
   }
+  // 附加玩法：只列出这个「棋盘 + 模式 + 数列」下真正有记录的组合，
+  // 否则四个开关的 16 种组合会铺满一屏空档位。
+  const va = $("#statVariant");
+  const curMask = DB.statsSel.variant || 0;
+  const masks = variantsWithRecords(boardOf(DB.statsSel).id, DB.statsSel.mode, DB.statsSel.seq);
+  if (masks.indexOf(curMask) < 0) {
+    masks.push(curMask);
+    masks.sort((a, b) => a - b);
+  }
+  va.innerHTML = "";
+  masks.forEach((m) => {
+    const b = document.createElement("button");
+    b.textContent = variantLabel(m);
+    b.dataset.variant = m;
+    b.className = m === curMask ? "on" : "";
+    va.appendChild(b);
+  });
+
+  // 数列规则只对正序 / 倒序有意义，其他模式恒为「全部」
+  const sq = $("#statSeq");
+  const showSeq = seqApplies(DB.statsSel.mode);
+  sq.style.display = showSeq ? "" : "none";
+  if (showSeq) {
+    sq.innerHTML = "";
+    SEQS.forEach((s) => {
+      const b = document.createElement("button");
+      b.textContent = s.name;
+      b.dataset.seq = s.key;
+      b.className = (DB.statsSel.seq || "all") === s.key ? "on" : "";
+      sq.appendChild(b);
+    });
+  }
+}
+
+/* 当前查看范围的文字描述，例如「5×5 正序 · 质数 · 动态」 */
+function scopeLabel() {
+  const v = DB.statsSel.variant || 0;
+  const s = (seqApplies(DB.statsSel.mode) && DB.statsSel.seq && DB.statsSel.seq !== "all")
+    ? " · " + seqName(DB.statsSel.seq) : "";
+  return boardOf(DB.statsSel).label + " " + MODES[DB.statsSel.mode].name +
+         s + (v ? " · " + variantLabel(v) : "");
 }
 
 function renderStats() {
   renderStatSegs();
-  const key = DB.statsSel.size + "-" + DB.statsSel.mode;
+  const key = recKey(boardOf(DB.statsSel).id, DB.statsSel.mode,
+                     variantKey(DB.statsSel.variant), DB.statsSel.seq);
   const recs = (DB.recs[key] || []).slice();
 
-  $("#totalsLine").textContent = "累计 " + DB.totals.sessions + " 次 · " + fmt(DB.totals.ms) + " 秒";
+  $("#totalsLine").textContent = "累计 " + DB.totals.sessions + " 次 · 共 " + fmtDuration(DB.totals.ms);
 
   // 摘要
   const sum = $("#summary");
   if (!recs.length) {
-    sum.innerHTML = '<div class="sum hero"><b>--<em>s</em></b><span>该组合还没有训练记录</span><span class="delta">选好规格与模式后开始训练吧</span></div>';
+    sum.innerHTML = '<div class="sum hero"><b>--</b><span>' + scopeLabel() +
+      ' 还没有训练记录</span><span class="delta">换个查看范围，或去训练页开始一局</span></div>';
   } else {
     const times = recs.map((r) => r.t);
     const best = Math.min(...times);
@@ -1127,9 +1975,9 @@ function renderStats() {
       }
     }
     sum.innerHTML =
-      '<div class="sum hero"><b>' + fmt(best) + '<em>s</em></b><span>历史最佳 · ' + DB.statsSel.size + '×' + DB.statsSel.size + ' ' + MODES[DB.statsSel.mode].name + '</span>' + deltaHtml + '</div>' +
-      '<div class="sum"><b>' + fmt(last) + '<em>s</em></b><span>最近一次</span></div>' +
-      '<div class="sum"><b>' + fmt(avg) + '<em>s</em></b><span>平均用时</span></div>' +
+      '<div class="sum hero"><b>' + fmtUnit(best, "em") + '</b><span>历史最佳 · ' + scopeLabel() + '</span>' + deltaHtml + '</div>' +
+      '<div class="sum"><b>' + fmtUnit(last, "em") + '</b><span>最近一次</span></div>' +
+      '<div class="sum"><b>' + fmtUnit(avg, "em") + '</b><span>平均用时</span></div>' +
       '<div class="sum"><b>' + avgErr.toFixed(2) + '</b><span>平均错误次数</span></div>' +
       '<div class="sum"><b>' + recs.length + '</b><span>训练次数</span></div>';
   }
@@ -1140,7 +1988,9 @@ function renderStats() {
 
 function renderRecList(recs) {
   const el = $("#recList");
-  $("#listHint").textContent = recs.length ? "共 " + recs.length + " 条，最近 30 条" : "";
+  $("#listHint").textContent = recs.length
+    ? (recs.length > 30 ? "共 " + recs.length + " 条，显示最近 30 条" : "共 " + recs.length + " 条")
+    : "";
   if (!recs.length) {
     el.innerHTML = '<div class="empty"><span class="big">📋</span>暂无记录</div>';
     return;
@@ -1154,8 +2004,9 @@ function renderRecList(recs) {
     const isBest = r.t === best;
     html += '<div class="ritem">' +
       '<span class="idx' + (isBest ? " best" : "") + '">' + realIdx + '</span>' +
-      '<span class="info"><b>' + fmt(r.t) + 's' + (isBest ? ' · 最佳' : '') + '</b>' +
-      '<span>' + fmtDate(r.ts) + ' · 平均 ' + (r.t / (DB.statsSel.size * DB.statsSel.size) / 1000).toFixed(2) + 's/格</span></span>' +
+      '<span class="info"><b>' + fmtT(r.t) + (isBest ? ' · 最佳' : '') + '</b>' +
+      '<span>' + fmtDate(r.ts) + ' · 平均 ' +
+        (r.t / (r.n || boardOf(DB.statsSel).n) / 1000).toFixed(2) + 's/目标</span></span>' +
       '<span class="err' + (r.e > 0 ? " has" : "") + '">' + (r.e > 0 ? "错 " + r.e : "全对") + '</span>' +
       '</div>';
   });
@@ -1238,11 +2089,33 @@ function renderChart(recs) {
   host.innerHTML = '<svg width="100%" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" role="img">' + g + '</svg>';
 }
 
+/* ---------------- 规格按钮 ----------------
+   方形与蜂窝共用同一个容器，内容按当前形状重建。
+   data-size 在方形下是边长 N，在蜂窝下是圈数 R，靠外面的 shape 决定怎么解释。 */
+function buildSizeSeg(container, shape, cur) {
+  const opts = shape === "hex"
+    ? [1, 2, 3, 4].map((R) => ({ v: R, label: R + "圈", sub: hexCount(R) + "格" }))
+    : [3, 4, 5, 6, 7].map((N) => ({ v: N, label: N + "×" + N, sub: (N * N) + "格" }));
+  container.style.gridTemplateColumns = "repeat(" + opts.length + ",1fr)";
+  container.innerHTML = "";
+  opts.forEach((o) => {
+    const b = document.createElement("button");
+    b.dataset.size = o.v;
+    b.innerHTML = o.label + "<small>" + o.sub + "</small>";
+    if (o.v === cur) b.classList.add("on");
+    container.appendChild(b);
+  });
+}
+
 /* ---------------- 首页渲染 ---------------- */
 function renderHome() {
-  document.querySelectorAll("#sizeSeg button").forEach((b) => {
-    b.classList.toggle("on", +b.dataset.size === DB.prefs.size);
+  document.querySelectorAll("#shapeSeg button").forEach((b) => {
+    b.classList.toggle("on", b.dataset.shape === DB.prefs.shape);
   });
+  const isHex = DB.prefs.shape === "hex";
+  buildSizeSeg($("#sizeSeg"), DB.prefs.shape, isHex ? DB.prefs.hexRing : DB.prefs.size);
+  $("#sizeHint").textContent = isHex ? "圈数越多，格子越多" : "数字越多，难度越高";
+
   document.querySelectorAll("#modeList .mode").forEach((b) => {
     b.classList.toggle("on", b.dataset.mode === DB.prefs.mode);
   });
@@ -1250,11 +2123,67 @@ function renderHome() {
   $("#optHint").checked = !!DB.prefs.hint;
   $("#optSound").checked = !!DB.prefs.sound;
   $("#optVibrate").checked = !!DB.prefs.vibrate;
+  $("#optDynamic").checked = !!DB.prefs.dynamic;
+  $("#optMemory").checked = !!DB.prefs.memory;
+  $("#optRot").checked = !!DB.prefs.rot;
+  $("#optNoDim").checked = !!DB.prefs.noDim;
 
-  const b = bestOf(DB.prefs.size + "-" + DB.prefs.mode);
+  // 数列规则只在正序 / 倒序下出现 —— 其他模式自带顺序规则
+  const showSeq = seqApplies(DB.prefs.mode);
+  $("#seqBlock").style.display = showSeq ? "" : "none";
+  if (showSeq) {
+    const seg = $("#seqSeg");
+    if (!seg.dataset.built) {
+      SEQS.forEach((s) => {
+        const b = document.createElement("button");
+        b.textContent = s.name;
+        b.dataset.seq = s.key;
+        seg.appendChild(b);
+      });
+      seg.dataset.built = "1";
+    }
+    seg.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.seq === DB.prefs.seq);
+    });
+    $("#seqDesc").textContent = DB.prefs.seq === "all"
+      ? "全部数字按顺序点"
+      : "只点" + seqName(DB.prefs.seq) + "，其余数字是干扰项";
+  }
+
+  // 换位节奏只在开了动态之后才有意义
+  $("#dynSpeedRow").style.display = DB.prefs.dynamic ? "" : "none";
+  document.querySelectorAll("#dynSpeedSeg button").forEach((b) => {
+    b.classList.toggle("on", +b.dataset.speed === DB.prefs.dynSpeed);
+  });
+  $("#dynSpeedDesc").textContent = "每 " + (dynSpeed().ms / 1000).toFixed(1) + " 秒交换一次";
+
+  // 记忆时长同理
+  $("#memSecRow").style.display = DB.prefs.memory ? "" : "none";
+  document.querySelectorAll("#memSecSeg button").forEach((b) => {
+    b.classList.toggle("on", +b.dataset.sec === DB.prefs.memSec);
+  });
+  $("#memSecDesc").textContent = "数字显示 " + DB.prefs.memSec + " 秒后隐藏";
+
+  // 旋转速度同理
+  $("#rotSpeedRow").style.display = DB.prefs.rot ? "" : "none";
+  document.querySelectorAll("#rotSpeedSeg button").forEach((b) => {
+    b.classList.toggle("on", +b.dataset.rot === DB.prefs.rotSpeed);
+  });
+  $("#rotSpeedDesc").textContent = (rotSpeed().ms / 1000).toFixed(0) + " 秒转一圈";
+
+  document.querySelectorAll("#setSeg button").forEach((b) => {
+    b.classList.toggle("on", +b.dataset.set === DB.prefs.setRounds);
+  });
+  const n = DB.prefs.setRounds || 1;
+  $("#setDesc").textContent = n > 1 ? "连跑 " + n + " 局，看平均值" : "一局一结算";
+
+  const pmask = variantMask(DB.prefs.dynamic, DB.prefs.memory, DB.prefs.rot, DB.prefs.noDim);
+  const b = bestOf(recKey(boardOf(DB.prefs).id, DB.prefs.mode, variantKey(pmask), DB.prefs.seq));
   const chip = $("#bestChip");
-  if (b !== null) { chip.style.display = ""; chip.textContent = "最佳 " + fmt(b) + "s"; }
-  else { chip.style.display = "none"; }
+  if (b !== null) {
+    chip.style.display = "";
+    chip.textContent = "最佳 " + fmtT(b) + (pmask ? "（" + variantLabel(pmask) + "）" : "");
+  } else { chip.style.display = "none"; }
 }
 
 /* ---------------- 切页 ---------------- */
@@ -1271,10 +2200,28 @@ function bind() {
     b.addEventListener("click", () => switchView(b.dataset.view));
   });
 
+  $("#shapeSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.shape = b.dataset.shape;
+    saveDB();
+    renderHome();
+  });
+
   $("#sizeSeg").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    DB.prefs.size = +b.dataset.size;
+    // 同一个 data-size 在两种形状下含义不同：方形是边长，蜂窝是圈数
+    if (DB.prefs.shape === "hex") DB.prefs.hexRing = +b.dataset.size;
+    else DB.prefs.size = +b.dataset.size;
+    saveDB();
+    renderHome();
+  });
+
+  $("#rotSpeedSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.rotSpeed = +b.dataset.rot;
     saveDB();
     renderHome();
   });
@@ -1287,33 +2234,84 @@ function bind() {
     renderHome();
   });
 
-  const optMap = { optFixation: "fixation", optHint: "hint", optSound: "sound", optVibrate: "vibrate" };
+  const optMap = { optFixation: "fixation", optHint: "hint", optSound: "sound",
+                   optVibrate: "vibrate", optDynamic: "dynamic", optMemory: "memory",
+                   optRot: "rot", optNoDim: "noDim" };
   Object.keys(optMap).forEach((id) => {
     $("#" + id).addEventListener("change", (e) => {
       DB.prefs[optMap[id]] = e.target.checked;
       saveDB();
       if (id === "optSound" && e.target.checked) { audioCtx(); SFX.ok(); }
       if (id === "optVibrate" && e.target.checked) vibrate(20);
+      // 切换各自子选项行的显示
+      if (id === "optDynamic" || id === "optMemory" || id === "optRot") renderHome();
     });
   });
 
-  $("#btnStart").addEventListener("click", () => { audioCtx(); startRound(); });
+  $("#dynSpeedSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.dynSpeed = +b.dataset.speed;
+    saveDB();
+    renderHome();
+  });
+
+  $("#seqSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.seq = b.dataset.seq;
+    saveDB();
+    renderHome();
+  });
+
+  $("#memSecSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.memSec = +b.dataset.sec;
+    saveDB();
+    renderHome();
+  });
+
+  $("#setSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.prefs.setRounds = +b.dataset.set;
+    saveDB();
+    renderHome();
+  });
+
+  $("#btnStart").addEventListener("click", () => { audioCtx(); beginSet(); });
 
   $("#btnPause").addEventListener("click", pauseRound);
   $("#btnQuit").addEventListener("click", quitRound);
   $("#btnResume").addEventListener("click", resumeRound);
-  $("#btnRestart").addEventListener("click", () => { clearCountdown(); quitRound(); setTimeout(startRound, 60); });
+  $("#btnRestart").addEventListener("click", () => { clearCountdown(); quitRound(); setTimeout(beginSet, 60); });
   $("#btnQuit2").addEventListener("click", quitRound);
   $("#btnAgain").addEventListener("click", () => {
     closeOverlay("resultOverlay");
-    setTimeout(startRound, 40);
+    setTimeout(beginSet, 40);
   });
-  $("#btnBack").addEventListener("click", () => { closeOverlay("resultOverlay"); renderHome(); });
+  $("#btnBack").addEventListener("click", () => {
+    closeOverlay("resultOverlay");
+    SET = { total: 1, index: 0, times: [] };
+    renderHome();
+  });
 
+  $("#btnNextRound").addEventListener("click", advanceSet);
+  $("#btnEndSet").addEventListener("click", endSetEarly);
+
+  $("#statShape").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.statsSel.shape = b.dataset.shape;
+    saveDB();
+    renderStats();
+  });
   $("#statSize").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    DB.statsSel.size = +b.dataset.size;
+    if (DB.statsSel.shape === "hex") DB.statsSel.hexRing = +b.dataset.size;
+    else DB.statsSel.size = +b.dataset.size;
     saveDB();
     renderStats();
   });
@@ -1324,18 +2322,33 @@ function bind() {
     saveDB();
     renderStats();
   });
+  $("#statVariant").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.statsSel.variant = +b.dataset.variant || 0;
+    saveDB();
+    renderStats();
+  });
+  $("#statSeq").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    DB.statsSel.seq = b.dataset.seq;
+    saveDB();
+    renderStats();
+  });
 
   $("#btnClear").addEventListener("click", () => {
     if (!confirm("确定要清空全部训练记录吗？此操作不可撤销。")) return;
     DB.recs = {};
     DB.totals = { sessions: 0, ms: 0 };
+    DB.statsSel.variant = 0;      // 记录都没了，附加筛选也回到「标准」
     saveDB(true);
     renderStats();
   });
 
   // 键盘：Esc 暂停 / 空格继续
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && G && G.running && !G.paused) { pauseRound(); return; }
+    if (e.key === "Escape" && G && !G.paused && (G.running || G.counting)) { pauseRound(); return; }
     if (e.key === " " || e.key === "Spacebar") {
       e.preventDefault();   // 避免空间键激活仍处于焦点的按钮
       if (G && G.paused) resumeRound();
@@ -1356,7 +2369,10 @@ function bind() {
     if (G) layoutBoard();
     clearTimeout(rTimer);
     rTimer = setTimeout(() => {
-      if ($("#view-stats").classList.contains("on")) renderChart((DB.recs[DB.statsSel.size + "-" + DB.statsSel.mode] || []).slice());
+      if ($("#view-stats").classList.contains("on")) {
+        renderChart((DB.recs[recKey(boardOf(DB.statsSel).id, DB.statsSel.mode,
+                      variantKey(DB.statsSel.variant), DB.statsSel.seq)] || []).slice());
+      }
     }, 160);
   });
   window.addEventListener("orientationchange", () => setTimeout(() => { if (G) layoutBoard(); }, 240));
@@ -1366,17 +2382,20 @@ function bind() {
     $("#topbar").classList.toggle("scrolled", window.scrollY > 4);
   }, { passive: true });
 
-  // 阻止双击缩放
-  let lastTouch = 0;
-  document.addEventListener("touchend", (e) => {
-    const now = Date.now();
-    if (now - lastTouch <= 300) e.preventDefault();
-    lastTouch = now;
-  }, { passive: false });
+  // 双击缩放交给 CSS 的 touch-action:manipulation 处理。
+  // 早先这里用 touchend + preventDefault 拦，会连带吞掉 300ms 内的第二次真实点击
+  // （比如在设置页快速连点两个选项），得不偿失。
 
-  // 页面隐藏时自动暂停
+  // 页面隐藏时自动暂停；连训的局间读秒同样要停下来，
+  // 否则切出去一趟回来会发现「已经替你跑了两局」
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && G && G.running && !G.paused) pauseRound();
+    if (!document.hidden) return;
+    if (G && !G.paused && (G.running || G.counting)) { pauseRound(); return; }
+    if (setTick) {
+      clearSetTimer();
+      setCountdown.textContent = "";
+      setBtnLabel.textContent = "继续下一局";
+    }
   });
 }
 
@@ -1387,9 +2406,16 @@ function bind() {
 window.__schulteBack = function () {
   const p = document.getElementById("pauseOverlay");
   const r = document.getElementById("resultOverlay");
-  if (r && r.classList.contains("on")) { closeOverlay("resultOverlay"); renderHome(); return true; }
+  const s = document.getElementById("setOverlay");
+  if (r && r.classList.contains("on")) {
+    closeOverlay("resultOverlay");
+    SET = { total: 1, index: 0, times: [] };
+    renderHome();
+    return true;
+  }
+  if (s && s.classList.contains("on")) { endSetEarly(); return true; }  // 局间过渡 -> 直接看统计
   if (p && p.classList.contains("on")) return true;          // 暂停中，请用界面上的按钮决定去留
-  if (G && G.running && !G.paused) { pauseRound(); return true; }
+  if (G && !G.paused && (G.running || G.counting)) { pauseRound(); return true; }
   if (trainScreen.classList.contains("on")) { quitRound(); return true; }
   return false;
 };
